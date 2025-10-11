@@ -25,7 +25,13 @@ def pack_tensors(
             Cumulative sequence lengths. Shape (B+1,).
         packed_tensors:
             Packed tensors with shape (total_valid_entries, ..., F).
+
+    Raises:
+        ValueError: If the mask is not of boolean type.
+        ValueError: If any tensor is not at least 2-dimensional.
     """
+    if mask.dtype != th.bool:
+        raise ValueError(f"Mask must be of boolean type, but got {mask.dtype}.")
     packed_tensors = []
     for tensor in tensors:
         if len(tensor.shape) < 2:
@@ -80,9 +86,9 @@ def unpack_tensors(
     ).unsqueeze(1)
     batched_tensors = []
     for tensor in tensors:
-        feature_dim = tensor.shape[1]
+        feature_like_dims = tensor.shape[1:]
         batched_tensor = th.zeros(
-            (batch_size, max_length, feature_dim),
+            (batch_size, max_length, *feature_like_dims),
             device=tensor.device,
             dtype=tensor.dtype,
         )
