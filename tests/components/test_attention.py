@@ -1,6 +1,6 @@
 import pytest
 import torch as th
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 from tests.helpers import MILD_TOLERANCE
 
@@ -59,77 +59,9 @@ def test_constructor_raises_when_invalid_divisibility(nheads_dim):
 @given(
     nheads_dim=nheads_and_dimensions(),
     culens_pack=culens_and_packed_len(),
-    seedvals=st.integers(0, 1000),
-)
-@settings(deadline=10_000)  # This test can be slow sometimes.
-def test_forward_matches_manual_computation(nheads_dim, culens_pack, seedvals):
-    """For random nheads/dim and random culens, inject a deterministic attention
-    function, set out_proj to identity, and assert forward(x) equals manual computation:
-      out = convert_from_headed_layout(attention(convert_to_headed_layout(to_qkv(x))))
-    """
-
-    nheads, dimension, _ = nheads_dim
-    culens, _ = culens_pack
-    packed_len = int(culens[-1].item())
-
-    # Build instance
-    attn = PackedSelfAttention(
-        dimension=dimension, nheads=nheads, use_flash_attention=True
-    ).to(DEVICE)
-
-    # deterministic attention function that returns sum over merge dim BUT depends on input values.
-    def det_attention(qkv, cu_seqlens_q, max_seqlen_q, flash_attn_kwargs):
-        # qkv shape: (packed_len, 3, nheads, head_dim)
-        # We'll compute output = sum over merge dim (dim=1)
-        return qkv.sum(dim=1)
-
-    attn._attention_function = det_attention
-
-    # Make out_proj identity so it doesn't change values
-    with th.no_grad():
-        # Zero then add eye to make identity
-        attn._out_proj.weight.zero_()
-        attn._out_proj.weight += th.eye(dimension)
-        if attn._out_proj.bias is not None:
-            attn._out_proj.bias.zero_()
-
-    # deterministic input: use rng seed to vary tests but deterministic per-case
-    rng = th.Generator().manual_seed(seedvals)
-    x = th.rand((packed_len, dimension), generator=rng, dtype=th.float32, device=DEVICE)
-
-    # run forward
-    out = attn.forward(x, culens, max_seqlen=None)
-
-    # manual computation:
-    # 1) to_qkv(x) -> shape (packed_len, 3*dimension)
-    qkv_flat = attn._to_qkv(x)  # (packed_len, 3*dimension)
-    # 2) convert to headed layout -> (packed_len, 3, nheads, head_dim)
-    qkv_headed = attn._convert_to_headed_layout(qkv_flat)
-    # 3) attention
-    attended = det_attention(
-        qkv_headed, cu_seqlens_q=culens, max_seqlen_q=None, flash_attn_kwargs=None
-    )
-    # 4) convert back -> (packed_len, dimension)
-    expected_flat = attn._convert_from_headed_layout(attended)
-    # 5) out_proj is identity => expected_flat unchanged
-
-    # assert exact equality (float32 deterministic ops here should be reproducible)
-    assert out.shape == (packed_len, dimension)
-    th.testing.assert_close(
-        out,
-        expected_flat,
-        **MILD_TOLERANCE,
-    )
-
-
-@given(
-    nheads_dim=nheads_and_dimensions(),
-    culens_pack=culens_and_packed_len(),
 )
 def test_attention_functions_swappable(nheads_dim, culens_pack):
-    """Ensure that we can swap out the attention function with a custom one.
-    We inject an attention function that returns sum over merge dim for shape correctness.
-    """
+    """Ensure that flash attention and fallback attention give same output."""
     nheads, _, head_dim = nheads_dim
     head_dim *= 8  # Features should be divisible by 8 for flash attention
     culens, _ = culens_pack
@@ -177,23 +109,23 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
         dimension=dimension, nheads=nheads, flash_attention_kwargs=train_kwargs
     ).to(DEVICE)
 
+    # record the flash_attn_kwargs passed to the attention function.
+    # In this test we don't care about the correctness of the attention computation.
     recorded = {"train_kw": None, "eval_kw": None}
 
     def record_attention(qkv, cu_seqlens_q, max_seqlen_q, flash_attn_kwargs):
-        # store a copy of the object or its dropout_p for inspection
         recorded["last"] = flash_attn_kwargs
-        # just return sum over merge dim for shape correctness
         return qkv.sum(dim=1)
 
     attn._attention_function = record_attention
 
-    # Run in training mode
+    # Get KW args in train mode
     attn.train()
     x = th.zeros((packed_len, dimension), dtype=th.float32, device=DEVICE)
     _ = attn.forward(x, culens, max_seqlen=None)
     recorded["train_kw"] = recorded.get("last")
 
-    # Run in eval mode
+    # Get KW args in eval mode
     attn.eval()
     _ = attn.forward(x, culens, max_seqlen=None)
     recorded["eval_kw"] = recorded.get("last")

@@ -1,9 +1,9 @@
 from dataclasses import replace
 from functools import partial
-from typing import override
 
 from einops import rearrange
 from torch import nn
+from typing_extensions import override
 
 from ml_utils.components.base import BaseComponent
 from ml_utils.torch_utils.types import CulensTensor, PackedTensor

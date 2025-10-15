@@ -1,22 +1,24 @@
+from typing import TypeAlias
+
 import jaxtyping as jt
 import torch as th
 
-type GeneralBatchedTensor = jt.Float[th.Tensor, "batch_size length ... dimension"]
-type GeneralPackedTensor = jt.Float[th.Tensor, "total_valid_entries ... dimension"]
+GeneralBatchedTensor: TypeAlias = jt.Float[th.Tensor, "batch_size length ... dimension"]
+GeneralPackedTensor: TypeAlias = jt.Float[th.Tensor, "total_valid_entries ... dimension"]
 
-type PackedTensor = jt.Float[th.Tensor, "packed_length dimension"]
-type BatchedTensor = jt.Float[th.Tensor, "batch_size length dimension"]
+PackedTensor: TypeAlias = jt.Float[th.Tensor, "packed_length dimension"]
+BatchedTensor: TypeAlias = jt.Float[th.Tensor, "batch_size length dimension"]
 
-type CulensTensor = jt.Int[th.Tensor, " batch_size+1"]
-type MaskTensor = jt.Bool[th.Tensor, "batch_size length"]
+CulensTensor: TypeAlias = jt.Int[th.Tensor, " batch_size+1"]
+MaskTensor: TypeAlias = jt.Bool[th.Tensor, "batch_size length"]
 
 
 # Multi-head attention-specific types
-type PackedMHATensor = jt.Float[th.Tensor, "packed_length nheads dimension"]
-type PackedKVTensor = jt.Float[th.Tensor, "packed_length 2 nheads dimension"]
-type PackedQKVTensor = jt.Float[th.Tensor, "packed_length 3 nheads dimension"]
+PackedMHATensor: TypeAlias = jt.Float[th.Tensor, "packed_length nheads dimension"]
+PackedKVTensor: TypeAlias = jt.Float[th.Tensor, "packed_length 2 nheads dimension"]
+PackedQKVTensor: TypeAlias = jt.Float[th.Tensor, "packed_length 3 nheads dimension"]
 
-type AllPackedQKVTypes = (
+AllPackedQKVTypes: TypeAlias = (
     tuple[PackedMHATensor, PackedMHATensor, PackedMHATensor]
     | tuple[PackedMHATensor, PackedKVTensor]
     | PackedQKVTensor
