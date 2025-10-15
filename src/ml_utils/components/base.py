@@ -12,5 +12,5 @@ class BaseComponent(Module, ABC):
 
     @property
     @abstractmethod
-    def in_dim(self) -> int:
-        """Input dimension of the component."""
+    def in_dim(self) -> int | None:
+        """Input dimension of the component. Can be None if input dimension is not fixed."""
