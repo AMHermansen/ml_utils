@@ -50,12 +50,12 @@ class SwiGLUMLP(BaseComponent):
 
     @property
     @override
-    def out_dim(self) -> int:
+    def out_features(self) -> int:
         return self._dim
 
     @property
     @override
-    def in_dim(self) -> int:
+    def in_features(self) -> int:
         return self._dim
 
     def forward(

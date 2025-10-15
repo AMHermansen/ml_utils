@@ -127,10 +127,10 @@ class PackedSelfAttention(BaseComponent):
 
     @override
     @property
-    def in_dim(self) -> int:
+    def in_features(self) -> int:
         return self._dimension
 
     @override
     @property
-    def out_dim(self) -> int:
+    def out_features(self) -> int:
         return self._dimension

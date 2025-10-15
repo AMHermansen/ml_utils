@@ -30,9 +30,9 @@ def check_feature_preserving(component: BaseComponent):
     Raises:
         ValueError: If the component is not shape-preserving.
     """
-    if component.in_dim != component.out_dim:
+    if component.in_features != component.out_features:
         raise ValueError(
-            f"Component {component} is not an endomorphism: in_dim={component.in_dim}, out_dim={component.out_dim}"
+            f"Component {component} is not an endomorphism: in_dim={component.in_features}, out_dim={component.out_features}"
         )
 
 
@@ -77,15 +77,15 @@ class Wrapper(BaseComponent):
 
     @override
     @property
-    def in_dim(self) -> int:
+    def in_features(self) -> int:
         """Input dimension of this module."""
-        return self.wrapped_component.in_dim
+        return self.wrapped_component.in_features
 
     @override
     @property
-    def out_dim(self) -> int:
+    def out_features(self) -> int:
         """Input dimension of this module."""
-        return self.wrapped_component.out_dim
+        return self.wrapped_component.out_features
 
     @abstractmethod
     def forward(
@@ -130,7 +130,7 @@ class Residual(Wrapper):
         """
         super().__init__(component)
         self._layer_scale_config = layer_scale_config
-        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_dim)
+        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_features)
 
     def forward(
         self,
@@ -172,12 +172,14 @@ class PreNormResidual(Wrapper):
         super().__init__(component)
         self._layer_scale_config = layer_scale_config
         if norm_name == "layer":
-            self.norm = nn.LayerNorm(self.in_dim, elementwise_affine=False, eps=eps)
+            self.norm = nn.LayerNorm(
+                self.in_features, elementwise_affine=False, eps=eps
+            )
         elif norm_name == "rms":
-            self.norm = nn.RMSNorm(self.in_dim, elementwise_affine=False, eps=eps)
+            self.norm = nn.RMSNorm(self.in_features, elementwise_affine=False, eps=eps)
         else:
             raise ValueError(f"Unknown norm_name: {norm_name}")
-        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_dim)
+        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_features)
 
     def __repr__(self) -> str:
         return f"Residual-{self.wrapped_component}"
@@ -228,14 +230,14 @@ class ResidualWithContext(Wrapper):
         self._layer_scale_config = layer_scale_config
         self._setup_layer_scale(layer_scale_config)
 
-        self.norm = nn.LayerNorm(self.in_dim, elementwise_affine=False)
-        self.scale = nn.Linear(context_dim, self.out_dim)
-        self.shift = nn.Linear(context_dim, self.out_dim)
+        self.norm = nn.LayerNorm(self.in_features, elementwise_affine=False)
+        self.scale = nn.Linear(context_dim, self.out_features)
+        self.shift = nn.Linear(context_dim, self.out_features)
         self.reset_parameters()
 
     def _setup_layer_scale(self, layer_scale_config: LayerScaleConfig | None) -> None:
         self.layer_scale_gate = (
-            nn.Linear(self._context_dim, self.out_dim)
+            nn.Linear(self._context_dim, self.out_features)
             if layer_scale_config
             else nn.Identity()
         )
