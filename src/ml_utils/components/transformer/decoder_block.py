@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import override
+
+from typing_extensions import override
 
 from ml_utils.components.attention import (
     CrossAttentionConfig,
@@ -140,6 +141,20 @@ class TransformerDecoderBlock(BaseComponent):
             )
         return self._feed_forward(x)
 
+    @property
+    def use_flash_attention(self) -> bool | None:
+        """Whether flash attention is used in the self-attention layer."""
+        if (
+            self.self_attention.use_flash_attention
+            != self.cross_attention.use_flash_attention
+        ):
+            return None
+        return self.attention.use_flash_attention
+
+    @use_flash_attention.setter
+    def use_flash_attention(self, value: bool):
+        self.self_attention.use_flash_attention = value
+        self.cross_attention.use_flash_attention = value
 
     @override
     @property

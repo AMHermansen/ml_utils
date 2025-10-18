@@ -1,11 +1,13 @@
 from dataclasses import dataclass, field
-from typing import override
+
+from typing_extensions import override
 
 from ml_utils.components.attention import PackedSelfAttention, SelfAttentionConfig
 from ml_utils.components.base import BaseComponent
 from ml_utils.components.swiglu import SwiGLUMLP
 from ml_utils.components.wrappers import Residual, ResidualConfig
 from ml_utils.torch_utils.types import CulensTensor, PackedTensor
+from ml_utils.utils import exists
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ class TransformerEncoderBlock(BaseComponent):
     def __init__(
         self,
         in_features: int,
-        config: TransformerEncoderBlockConfig
+        config: TransformerEncoderBlockConfig | None = None
     ):
         """Transformer block consisting of self-attention and SwiGLU MLP.
 
@@ -50,6 +52,7 @@ class TransformerEncoderBlock(BaseComponent):
             config: Configuration for the Transformer block.
         """
         super().__init__()
+        config = config if exists(config) else TransformerEncoderBlockConfig()
         self._config = config
 
         self.attention = Residual(
@@ -82,6 +85,15 @@ class TransformerEncoderBlock(BaseComponent):
         """
         x = self.attention(x, cu_seqlens, max_seqlen)
         return self._feed_forward(x)
+
+    @property
+    def use_flash_attention(self) -> bool:
+        """Whether flash attention is used in the self-attention layer."""
+        return self.attention.use_flash_attention
+
+    @use_flash_attention.setter
+    def use_flash_attention(self, value: bool):
+        self.attention.use_flash_attention = value
 
     @override
     @property
