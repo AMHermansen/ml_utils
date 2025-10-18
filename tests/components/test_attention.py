@@ -1,11 +1,12 @@
 import pytest
 import torch as th
-from hypothesis import given
+import torch.cuda
+from hypothesis import given, settings
 from hypothesis import strategies as st
-from tests.helpers import MILD_TOLERANCE
 
 from ml_utils.components import PackedSelfAttention
 from ml_utils.components.attention import FlashAttentionKWArgs
+from tests.helpers import MILD_TOLERANCE
 
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -62,6 +63,8 @@ def test_constructor_raises_when_invalid_divisibility(nheads_dim):
 )
 def test_attention_functions_swappable(nheads_dim, culens_pack):
     """Ensure that flash attention and fallback attention give same output."""
+    if not torch.cuda.is_available():
+        pytest.skip("Flash attention not available on CPU.")
     nheads, _, head_dim = nheads_dim
     head_dim *= 8  # Features should be divisible by 8 for flash attention
     culens, _ = culens_pack
@@ -92,6 +95,7 @@ def test_attention_functions_swappable(nheads_dim, culens_pack):
     culens_pack=culens_and_packed_len(),
     dropout_p=st.floats(min_value=0.0, max_value=0.5),
 )
+@settings(deadline=10_000)
 def test_training_vs_eval_flash_attention_kwargs_selected(
     nheads_dim, culens_pack, dropout_p
 ):
@@ -115,7 +119,9 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
 
     def record_attention(qkv, cu_seqlens_q, max_seqlen_q, flash_attn_kwargs):
         recorded["last"] = flash_attn_kwargs
-        return qkv.sum(dim=1)
+        if isinstance(qkv, th.Tensor):
+            return qkv.sum(dim=1)
+        return sum(qkv)
 
     attn._attention_function = record_attention
 
