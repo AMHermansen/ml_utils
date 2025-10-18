@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, ClassVar, Literal
 
 import jaxtyping as jt
 import torch as th
@@ -44,7 +44,7 @@ def check_feature_preserving(component: BaseComponent):
     """
     if component.in_features != component.out_features:
         raise ValueError(
-            f"Component {component} is not an endomorphism: in_dim={component.in_features}, out_dim={component.out_features}"
+            f"Component {component} is not feature-preserving: in_dim={component.in_features}, out_dim={component.out_features}"
         )
 
 
@@ -70,9 +70,18 @@ def setup_layer_scale(config: ResidualConfig | None, dim: int) -> nn.Parameter |
 class Wrapper(BaseComponent):
     """Base class for wrappers around components.
 
+    When this is subclassed, it is very important to include all local attributes
+    in the `_base_local_attrs` set to avoid infinite recursion in `__getattr__
+    and `__setattr__`.
+
     Args:
-        wrapped_component (BaseComponent): A component with matching input and output dimensions.
+        wrapped_component (BaseComponent): A component with matching input and output
+            dimensions.
     """
+
+    # It is EXTREMELY important that all local attributes are included here to avoid
+    # infinite recursion in __getattr__ and __setattr__.
+    _base_local_attrs: ClassVar[set[str]] = {"wrapped_component"}
 
     def __init__(
         self,
@@ -99,6 +108,13 @@ class Wrapper(BaseComponent):
         """Input dimension of this module."""
         return self.wrapped_component.out_features
 
+    # We're making this abstract to get additional confirmation that subclasses
+    # are including their local attributes in _base_local_attrs.
+    @property
+    @abstractmethod
+    def _local_attrs(self) -> set[str]:
+        return self._base_local_attrs
+
     @abstractmethod
     def forward(
         self,
@@ -117,6 +133,31 @@ class Wrapper(BaseComponent):
             Output tensor of shape `(*batches, dim)`
         """
 
+    # Moderately cursed python, to delegate attribute access to the wrapped components.
+    # This makes it much cleaner to interact with the wrapped component's attributes.
+    def __getattr__(self, item: str) -> Any:
+        """Delegate attribute access to the wrapped component if not found.
+
+        Args:
+            item: Attribute name.
+
+        Returns:
+            Attribute value.
+        """
+        try:
+            return super().__getattr__(item)
+        except AttributeError:
+            return getattr(self.wrapped_component, item)
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        """Delegate attribute setting to the wrapped component if not found."""
+        local_attrs = self._local_attrs
+
+        if key in local_attrs or not hasattr(self, "wrapped_component"):
+            super().__setattr__(key, value)
+        else:
+            setattr(self.wrapped_component, key, value)
+
 
 class Residual(Wrapper):
     """Wraps a module with a normalisation layer and residual connection.
@@ -125,6 +166,10 @@ class Residual(Wrapper):
         component (BaseComponent): Wrapped component.
         config (ResidualConfig | None): Configuration for residual wrapper.
     """
+    _base_local_attrs: ClassVar[set[str]] = (
+        Wrapper._base_local_attrs
+        | {"norm", "layer_scale", "_config"}
+    )
 
     def __init__(
         self,
@@ -160,6 +205,11 @@ class Residual(Wrapper):
         """Whether layer scaling is applied."""
         return self.layer_scale is not None
 
+    @override
+    @property
+    def _local_attrs(self) -> set[str]:
+        return self._base_local_attrs
+
     def forward(
         self,
         x: jt.Float[th.Tensor, "*batches dim"],
@@ -179,6 +229,10 @@ class ResidualWithContext(Wrapper):
     If context is provided, it is used for adaptive normalisation and gating.
     Gating is always initialised as zero, so the module is initially bypassed.
     """
+    _base_local_attrs: ClassVar[set[str]] = (
+        Wrapper._base_local_attrs
+        | {"_context_dim", "_config", "norm", "scale", "shift", "layer_scale_gate"}
+    )
 
     def __init__(
         self,
@@ -222,6 +276,11 @@ class ResidualWithContext(Wrapper):
     def context_dim(self) -> int:
         """Dimension of the context vector."""
         return self._context_dim
+
+    @override
+    @property
+    def _local_attrs(self) -> set[str]:
+        return self._base_local_attrs
 
     def reset_parameters(self) -> None:
         self.scale.weight.data.zero_()
@@ -278,6 +337,7 @@ class DropPath(Wrapper):
         component (BaseComponent): The component to apply DropPath to.
         drop_prob (float): Probability of an element to be zeroed. Default: 0.0
     """
+    _base_local_attrs: ClassVar[set[str]] = Wrapper._base_local_attrs | {"drop_prob"}
 
     def __init__(self, component: BaseComponent, drop_prob: float = 0.0) -> None:
         """Constructor for DropPath.
@@ -312,3 +372,8 @@ class DropPath(Wrapper):
         dropped = append_dimensions(dropped, x.dim())
         output = self.wrapped_component(x, *args, **kwargs)
         return output.div(keep_prob) * dropped
+
+    @override
+    @property
+    def _local_attrs(self) -> set[str]:
+        return self._base_local_attrs
