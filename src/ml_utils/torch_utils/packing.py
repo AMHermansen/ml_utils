@@ -135,3 +135,33 @@ def prepend_tokens_to_packed_tensor(
     new_cu_seqlens, (new_packed_tensor, ) = pack_tensors(mask_new, new_unpacked)
     assert is_increasing_sequence(new_cu_seqlens), "cu_seqlens must be an increasing sequence"
     return new_packed_tensor, new_cu_seqlens
+
+
+def remove_tokens_from_packed_tensor(
+    packed_tensor: jt.Float[th.Tensor, " total_len *feature_dims"],
+    cu_seqlens: CulensTensor,
+    n_tokens: int,
+) -> tuple[GeneralPackedTensor, CulensTensor]:
+    """Removes tokens from the start of a packed sequence.
+
+    Args:
+        packed_tensor: The input packed sequence. Shape (total_len, *feature_dims).
+        cu_seqlens: The cumulative sequence lengths. Shape (batch_size + 1,).
+        n_tokens: The number of tokens to remove from the start of each sequence.
+
+    Returns:
+        tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative sequence lengths
+    """
+    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
+    mask, (unpacked_tensors, ) = unpack_tensors(cu_seqlens, packed_tensor)
+    unpacked_shape = unpacked_tensors.shape
+    if n_tokens >= unpacked_shape[1]:
+        raise ValueError(
+            f"Cannot remove {n_tokens} tokens from sequences of length "
+            f"{unpacked_shape[1]}."
+        )
+    new_unpacked = unpacked_tensors[:, n_tokens:, ...]
+    mask_new = mask[:, n_tokens:]
+    new_cu_seqlens, (new_packed_tensor, ) = pack_tensors(mask_new, new_unpacked)
+    assert is_increasing_sequence(new_cu_seqlens), "cu_seqlens must be an increasing sequence"
+    return new_packed_tensor, new_cu_seqlens
