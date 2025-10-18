@@ -1,11 +1,9 @@
 """Utilities for converting between different tensor layouts used in attention
 mechanisms.
 """
-import torch as th
 from einops import rearrange
 
 from ml_utils.torch_utils.types import (
-    CulensTensor,
     PackedKVTensor,
     PackedQKVTensor,
     PackedTensor,
@@ -60,8 +58,3 @@ def convert_from_headed_layout(
         pattern="tot_len nheads dim -> tot_len (nheads dim)",
         nheads=nheads,
     )
-
-
-def is_increasing_sequence(cu_seqlens: CulensTensor) -> bool:
-    """Check if cu_seqlens represent an increasing sequence."""
-    return th.all(th.diff(cu_seqlens) > 0).item()

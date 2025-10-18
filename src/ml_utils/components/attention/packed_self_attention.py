@@ -19,6 +19,7 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
+from ...torch_utils.misc import is_increasing_sequence
 from .attention_config import SelfAttentionConfig
 from .qk_norm import QKNorm
 from .qkv_linear import QKVLinear
@@ -120,6 +121,7 @@ class PackedSelfAttention(BaseComponent):
         Returns:
             Packed output tensor of shape (packed_length, dimension)
         """
+        assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
         flash_attention_kwargs = (
             self._train_flash_attention_kwargs
             if self.training

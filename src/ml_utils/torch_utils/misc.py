@@ -1,8 +1,19 @@
+# This file includes code adapted from:
+#   https://github.com/mattcleigh/mltools
+# Copyright (c) Matthew Leigh
+# Licensed under the MIT License (See LICENSE file for details).
+
+"""Miscellaneous pytorch utility functions."""
+
 import torch as th
+
+from ml_utils.torch_utils.types import CulensTensor
 
 
 def append_dimensions(x: th.Tensor, target_dimensions: int, dim: int = -1) -> th.Tensor:
     """Appends dimensions of size 1 to a tensor until it reaches the target number of dimensions.
+
+    Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
 
     Args:
         x (th.Tensor): The input tensor.
@@ -34,3 +45,8 @@ def append_dimensions(x: th.Tensor, target_dimensions: int, dim: int = -1) -> th
     if dim < 0:
         dim += x.dim() + 1
     return x.view(*x.shape[:dim], *dim_diff * (1,), *x.shape[dim:])
+
+
+def is_increasing_sequence(cu_seqlens: CulensTensor) -> bool:
+    """Check if cu_seqlens represent an increasing sequence."""
+    return th.all(th.diff(cu_seqlens) > 0).item()

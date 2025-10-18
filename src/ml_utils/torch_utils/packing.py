@@ -1,7 +1,9 @@
 """Module for converting between packed and batched representations of data."""
 
+import jaxtyping as jt
 import torch as th
 
+from ml_utils.torch_utils.misc import is_increasing_sequence
 from ml_utils.torch_utils.types import (
     CulensTensor,
     GeneralBatchedTensor,
@@ -54,6 +56,9 @@ def pack_tensors(
         ),
         dim=0,
     )
+    # We really, really do not want cu_seqlens to not be increasing.
+    # Leads to very hard to debug errors in flash attention.
+    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
     return cu_seqlens, tuple(packed_tensors)
 
 
@@ -78,6 +83,9 @@ def unpack_tensors(
             Unpacked tensors with shape (B, N, ..., F).
 
     """
+    # We really, really do not want cu_seqlens to not be increasing.
+    # Leads to very hard to debug errors in flash attention.
+    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
     if max_length is None:
         max_length = th.diff(cu_seqlens).max().item()
     batch_size = len(cu_seqlens) - 1
@@ -95,3 +103,35 @@ def unpack_tensors(
         batched_tensor[mask] = tensor
         batched_tensors.append(batched_tensor)
     return mask, tuple(batched_tensors)
+
+
+def prepend_tokens_to_packed_tensor(
+    packed_tensor: jt.Float[th.Tensor, " total_len *feature_dims"],
+    cu_seqlens: CulensTensor,
+    tokens: jt.Float[th.Tensor, " n_tokens *feature_dims"],
+) -> tuple[GeneralPackedTensor, CulensTensor]:
+    """Prepends tokens to a packed sequence.
+
+    Args:
+        packed_tensor: The input packed sequence. Shape (total_len, *feature_dims).
+        cu_seqlens: The cumulative sequence lengths. Shape (batch_size + 1,).
+        tokens: The tokens to prepend. Shape (n_tokens, *feature_dims).
+
+    Returns:
+        tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative sequence lengths.
+    """
+    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
+    mask, (unpacked_tensors, ) = unpack_tensors(cu_seqlens, packed_tensor)
+    batch_size = len(cu_seqlens) - 1
+    unpacked_shape = unpacked_tensors.shape
+    tokens_expanded = tokens.unsqueeze(0).repeat(
+        batch_size, 1, *[1] * (len(unpacked_shape) - 2)
+    )
+    new_unpacked = th.cat([tokens_expanded, unpacked_tensors], dim=1)
+    mask_new = th.cat(
+        [th.ones((batch_size, tokens.shape[0]), dtype=th.bool, device=mask.device), mask],
+        dim=1,
+    )
+    new_cu_seqlens, (new_packed_tensor, ) = pack_tensors(mask_new, new_unpacked)
+    assert is_increasing_sequence(new_cu_seqlens), "cu_seqlens must be an increasing sequence"
+    return new_packed_tensor, new_cu_seqlens

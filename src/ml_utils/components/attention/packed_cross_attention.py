@@ -17,6 +17,7 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
+from ...torch_utils.misc import is_increasing_sequence
 from .attention_config import CrossAttentionConfig, FlashAttentionKWArgs
 from .qk_norm import QKNorm
 from .torch_flash_interface import torch_flash_attention_interface
@@ -121,6 +122,9 @@ class PackedCrossAttention(BaseComponent):
         max_seqlen_q: int | None = None,
         max_seqlen_kv: int | None = None,
     ):
+        assert is_increasing_sequence(cu_seqlens_q), "cu_seqlens_q must be increasing"
+        assert is_increasing_sequence(cu_seqlens_kv), "cu_seqlens_kv must be increasing"
+
         flash_attention_kwargs = (
             self._train_flash_attention_kwargs
             if self.training
