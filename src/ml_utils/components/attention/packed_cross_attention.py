@@ -1,15 +1,11 @@
 from dataclasses import replace
 from functools import partial
-from typing import override
 
 from torch import nn
+from typing_extensions import override
 
-from ml_utils.components.attention._utils import (
-    convert_from_headed_layout,
-    convert_to_headed_and_kvmerged_layout,
-    convert_to_headed_layout,
-)
 from ml_utils.components.base import BaseComponent
+from ml_utils.torch_utils.misc import is_increasing_sequence
 from ml_utils.torch_utils.types import (
     AllPackedQKVTypes,
     CulensTensor,
@@ -17,7 +13,11 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
-from ...torch_utils.misc import is_increasing_sequence
+from ._utils import (
+    convert_from_headed_layout,
+    convert_to_headed_and_kvmerged_layout,
+    convert_to_headed_layout,
+)
 from .attention_config import CrossAttentionConfig, FlashAttentionKWArgs
 from .qk_norm import QKNorm
 from .torch_flash_interface import torch_flash_attention_interface
@@ -199,6 +199,7 @@ class PackedCrossAttention(BaseComponent):
 
     @property
     def kv_in_features(self) -> int:
+        """Input feature dimension for conditioning sequence."""
         return self._kv_in_dim
 
     @override

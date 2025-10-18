@@ -5,12 +5,8 @@ import torch as th
 from torch import nn
 from typing_extensions import override
 
-from ml_utils.components.attention._utils import (
-    convert_from_headed_layout,
-    convert_to_headed_and_qkvmerged_layout,
-    convert_to_headed_layout,
-)
 from ml_utils.components.base import BaseComponent
+from ml_utils.torch_utils.misc import is_increasing_sequence
 from ml_utils.torch_utils.types import (
     CulensTensor,
     PackedMHATensor,
@@ -19,7 +15,11 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
-from ...torch_utils.misc import is_increasing_sequence
+from ._utils import (
+    convert_from_headed_layout,
+    convert_to_headed_and_qkvmerged_layout,
+    convert_to_headed_layout,
+)
 from .attention_config import SelfAttentionConfig
 from .qk_norm import QKNorm
 from .qkv_linear import QKVLinear
