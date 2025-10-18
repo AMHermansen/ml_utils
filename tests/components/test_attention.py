@@ -5,7 +5,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from ml_utils.components import PackedSelfAttention
-from ml_utils.components.attention import FlashAttentionKWArgs
+from ml_utils.components.attention import FlashAttentionKWArgs, SelfAttentionConfig
 from tests.helpers import MILD_TOLERANCE
 
 DEVICE = th.device("cuda" if th.cuda.is_available() else "cpu")
@@ -54,7 +54,10 @@ def test_constructor_raises_when_invalid_divisibility(nheads_dim):
         return  # can't make invalid case if nheads=1
     bad_dim = dimension + 1  # guaranteed not divisible by nheads
     with pytest.raises(ValueError):
-        PackedSelfAttention(dimension=bad_dim, nheads=nheads)
+        PackedSelfAttention(
+            in_features=bad_dim,
+            config=SelfAttentionConfig(nheads=nheads),
+        )
 
 
 @given(
@@ -71,7 +74,8 @@ def test_attention_functions_swappable(nheads_dim, culens_pack):
     packed_len = int(culens[-1].item())
 
     attn = PackedSelfAttention(
-        dimension=nheads * head_dim, nheads=nheads, use_flash_attention=True
+        in_features=nheads * head_dim,
+        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True)
     ).to(DEVICE)
 
     x = th.randn((packed_len, nheads * head_dim), dtype=th.float32, device=DEVICE)
@@ -110,7 +114,8 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
     train_kwargs = FlashAttentionKWArgs(dropout_p=dropout_p, causal=False)
 
     attn = PackedSelfAttention(
-        dimension=dimension, nheads=nheads, flash_attention_kwargs=train_kwargs
+        in_features=dimension,
+        config=SelfAttentionConfig(nheads=nheads, flash_attention_kwargs=train_kwargs)
     ).to(DEVICE)
 
     # record the flash_attn_kwargs passed to the attention function.
@@ -154,7 +159,8 @@ def test_use_flash_attention_setter_toggles(nheads_dim):
     """
     nheads, dimension, _ = nheads_dim
     attn = PackedSelfAttention(
-        dimension=dimension, nheads=nheads, use_flash_attention=True
+        in_features=dimension,
+        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True)
     ).to(DEVICE)
 
     # initial state True
