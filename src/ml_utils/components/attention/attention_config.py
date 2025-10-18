@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 
-@dataclass
+@dataclass(frozen=True)
 class FlashAttentionKWArgs:
     """Structure of keyword arguments to pass into varlen_attn functions.
 
@@ -31,7 +31,7 @@ class FlashAttentionKWArgs:
     deterministic: bool = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class SelfAttentionConfig:
     """Configuration for self-attention modules.
 
@@ -55,7 +55,7 @@ class SelfAttentionConfig:
     use_flash_attention: bool = True
 
 
-@dataclass
+@dataclass(frozen=True)
 class CrossAttentionConfig:
     """Configuration for cross-attention modules.
 

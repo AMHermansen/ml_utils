@@ -37,32 +37,31 @@ class PackedSelfAttention(BaseComponent):
     """Multi-head self-attention layer for packed sequences.
 
     Args:
-        dimension: Dimension of the input and output features.
-        nheads: Number of attention heads.
-        flash_attention_kwargs: Additional keyword arguments for flash attention.
-        use_flash_attention: Whether to use flash attention or standard attention.
+        in_features: Dimension of the input and output features.
+        config: Configuration for the self-attention layer. See `SelfAttentionConfig`.
+            for detailed explanations.
     """
 
     def __init__(
         self,
-        dimension: int,
+        in_features: int,
         config: SelfAttentionConfig | None = None,
     ):
         """Constructor for PackedSelfAttention.
 
         Args:
-            dimension: Dimension of the input and output features.
-
+            in_features: Dimension of the input and output features.
+            config: Configuration for the self-attention layer. See `SelfAttentionConfig`.
 
         Raises:
             ValueError: If dimension is not divisible by nheads.
         """
         config = config if exists(config) else SelfAttentionConfig()
         super().__init__()
-        if dimension % config.nheads != 0:
+        if in_features % config.nheads != 0:
             raise ValueError("dimension must be divisible by nheads")
         self._nheads = config.nheads
-        self._dimension = dimension
+        self._dimension = in_features
         self._qkv_bias = config.qkv_bias
         self._qk_norm_type = config.qk_norm_type
         self._include_qk_norm = exists(config.qk_norm_type)
@@ -93,16 +92,16 @@ class PackedSelfAttention(BaseComponent):
         # QKNorm only gets initialized if self._qk_norm_type is not None
         # Somehow type checker fails to realize that so disabling the check here
         self._qk_norm = (
-            QKNorm(dimension // config.nheads, norm_type=self._qk_norm_type)  # type: ignore
+            QKNorm(in_features // config.nheads, norm_type=self._qk_norm_type)  # type: ignore
             if self._include_qk_norm
             else None
         )
         self._qkv_proj = QKVLinear(
-            dimension,
+            in_features,
             bias=config.qkv_bias,
             split_qkv=config.split_qkv,
         )
-        self._out_proj = nn.Linear(dimension, dimension)
+        self._out_proj = nn.Linear(in_features, in_features)
 
     def forward(
         self,

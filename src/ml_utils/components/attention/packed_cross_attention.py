@@ -1,5 +1,6 @@
 from dataclasses import replace
 from functools import partial
+from typing import override
 
 from torch import nn
 
@@ -8,6 +9,7 @@ from ml_utils.components.attention._utils import (
     convert_to_headed_and_kvmerged_layout,
     convert_to_headed_layout,
 )
+from ml_utils.components.base import BaseComponent
 from ml_utils.torch_utils.types import (
     AllPackedQKVTypes,
     CulensTensor,
@@ -28,31 +30,29 @@ except ImportError:
     common_flash_attention_interface = torch_flash_attention_interface
 
 
-class PackedCrossAttention(nn.Module):
+class PackedCrossAttention(BaseComponent):
     def __init__(
         self,
-        dimension: int,
-        q_in_dim: int,
+        in_features: int,
         config: CrossAttentionConfig | None = None,
     ):
         """Packed Cross-Attention module supporting flash attention and QK normalization.
 
         Args:
-            dimension: The embedding dimension of the attention.
-            q_in_dim: The input dimension for the query.
+            in_features: The embedding dimension of the attention.
             config: Configuration for the cross-attention module.
         """
         config = config if exists(config) else CrossAttentionConfig()
         super().__init__()
-        if dimension % config.nheads != 0:
+        if in_features % config.nheads != 0:
             raise ValueError("dimension must be divisible by nheads")
 
         self._config = config
         self._nheads = config.nheads
-        self._dimension = dimension
-        self._head_dim = dimension // config.nheads
-        self._q_in_dim = q_in_dim
-        self._kv_in_dim = config.kv_in_dim if exists(config.kv_in_dim) else q_in_dim
+        self._dimension = in_features
+        self._head_dim = in_features // config.nheads
+        self._q_in_dim = in_features
+        self._kv_in_dim = config.kv_in_dim if exists(config.kv_in_dim) else in_features
         self._q_bias = config.q_bias
         self._kv_bias = config.kv_bias
         self._use_qk_norm = exists(config.qk_norm_type)
@@ -93,7 +93,7 @@ class PackedCrossAttention(nn.Module):
         # QKNorm only gets initialized if self._qk_norm_type is not None
         # Somehow type checker fails to realize that so disabling the check here
         self._qk_norm = (
-            QKNorm(dimension // config.nheads, norm_type=self._qk_norm_type)  # type: ignore
+            QKNorm(in_features // config.nheads, norm_type=self._qk_norm_type)  # type: ignore
             if self._include_qk_norm
             else None
         )
@@ -101,16 +101,16 @@ class PackedCrossAttention(nn.Module):
         # Projection layers
         self._q_proj = nn.Linear(
             in_features=self._q_in_dim,
-            out_features=dimension,
+            out_features=in_features,
             bias=config.q_bias,
         )
         self._kv_proj = nn.Linear(
             in_features=self._kv_in_dim,
-            out_features=2 * dimension,
+            out_features=2 * in_features,
             bias=config.kv_bias,
         )
 
-        self._out_proj = nn.Linear(dimension, dimension)
+        self._out_proj = nn.Linear(in_features, in_features)
 
     def forward(
         self,
@@ -188,6 +188,7 @@ class PackedCrossAttention(nn.Module):
             else torch_flash_attention_interface
         )
 
+    @override
     @property
     def in_features(self) -> int:
         return self._q_in_dim
@@ -196,6 +197,7 @@ class PackedCrossAttention(nn.Module):
     def kv_in_features(self) -> int:
         return self._kv_in_dim
 
+    @override
     @property
     def out_features(self) -> int:
         return self._dimension
