@@ -1,12 +1,15 @@
 from dataclasses import replace
 from functools import partial
-from typing import Literal
 
 import torch as th
-from einops import rearrange
 from torch import nn
 from typing_extensions import override
 
+from ml_utils.components.attention._utils import (
+    convert_from_headed_layout,
+    convert_to_headed_and_qkvmerged_layout,
+    convert_to_headed_layout,
+)
 from ml_utils.components.base import BaseComponent
 from ml_utils.torch_utils.types import (
     CulensTensor,
@@ -16,7 +19,7 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
-from .attention_config import FlashAttentionKWArgs
+from .attention_config import SelfAttentionConfig
 from .qk_norm import QKNorm
 from .qkv_linear import QKVLinear
 from .torch_flash_interface import torch_flash_attention_interface
@@ -43,82 +46,75 @@ class PackedSelfAttention(BaseComponent):
     def __init__(
         self,
         dimension: int,
-        nheads: int,
-        qkv_bias: bool = False,
-        split_qkv: bool = False,
-        qk_norm_type: Literal["layer", "rms"] | None = "rms",
-        flash_attention_kwargs: FlashAttentionKWArgs | None = None,
-        use_flash_attention: bool = True,
+        config: SelfAttentionConfig | None = None,
     ):
         """Constructor for PackedSelfAttention.
 
         Args:
             dimension: Dimension of the input and output features.
-            nheads: Number of attention heads.
-            split_qkv: Whether to use separate linear layers for Q, K, V projections.
-                This might be advantageous for Muon optimizer.
-            qk_norm_type: Type of normalization to apply to Q and K. Can be "layer",
-                "rms", or None. Default is "rms".
-            qkv_bias: Whether to include bias in the QKV linear layer.
-            flash_attention_kwargs: Additional keyword arguments for flash attention.
-            use_flash_attention: Whether to use flash attention or standard attention.
+
 
         Raises:
             ValueError: If dimension is not divisible by nheads.
         """
+        config = config if exists(config) else SelfAttentionConfig()
         super().__init__()
-        if dimension % nheads != 0:
+        if dimension % config.nheads != 0:
             raise ValueError("dimension must be divisible by nheads")
-        self._nheads = nheads
+        self._nheads = config.nheads
         self._dimension = dimension
-        self._qkv_bias = qkv_bias
-        self._qk_norm_type = qk_norm_type
-        self._include_qk_norm = exists(qk_norm_type)
-        self._train_flash_attention_kwargs = (
-            flash_attention_kwargs
-            if flash_attention_kwargs is not None
-            else FlashAttentionKWArgs()
-        )
+        self._qkv_bias = config.qkv_bias
+        self._qk_norm_type = config.qk_norm_type
+        self._include_qk_norm = exists(config.qk_norm_type)
+        self._train_flash_attention_kwargs = config.flash_attention_kwargs
         self._eval_flash_attention_kwargs = replace(
             self._train_flash_attention_kwargs,
             dropout_p=0.0,  # No dropout during evaluation
         )
-        self._use_flash_attention = use_flash_attention
+        self._use_flash_attention = config.use_flash_attention
+        self._convert_to_headed_and_merged_layout = partial(
+            convert_to_headed_and_qkvmerged_layout,
+            nheads=config.nheads,
+        )
         self._convert_to_headed_layout = partial(
-            rearrange,
-            pattern="tot_len (n_merge nheads dim) -> tot_len n_merge nheads dim",
-            nheads=nheads,
-            n_merge=3,  # for QKV
+            convert_to_headed_layout,
+            nheads=config.nheads,
         )
         self._convert_from_headed_layout = partial(
-            rearrange,
-            pattern="packed_length nheads dim -> packed_length (nheads dim)",
-            nheads=nheads,
+            convert_from_headed_layout,
+            nheads=config.nheads,
         )
         self._attention_function = (
             common_flash_attention_interface
-            if use_flash_attention
+            if config.use_flash_attention
             else torch_flash_attention_interface
         )
 
         # QKNorm only gets initialized if self._qk_norm_type is not None
         # Somehow type checker fails to realize that so disabling the check here
         self._qk_norm = (
-            QKNorm(dimension // nheads, norm_type=self._qk_norm_type)  # type: ignore
+            QKNorm(dimension // config.nheads, norm_type=self._qk_norm_type)  # type: ignore
             if self._include_qk_norm
             else None
         )
-        self._qkv_proj = QKVLinear(dimension, bias=qkv_bias, split_qkv=split_qkv)
+        self._qkv_proj = QKVLinear(
+            dimension,
+            bias=config.qkv_bias,
+            split_qkv=config.split_qkv,
+        )
         self._out_proj = nn.Linear(dimension, dimension)
 
     def forward(
-        self, x: PackedTensor, culens: CulensTensor, max_seqlen: int | None
+        self,
+        x: PackedTensor,
+        cu_seqlens: CulensTensor,
+        max_seqlen: int | None,
     ) -> PackedTensor:
         """Forward pass of the packed self-attention layer.
 
         Args:
             x: Packed input tensor of shape (packed_length, dimension)
-            culens: Cumulative lengths tensor of shape (batch_size + 1)
+            cu_seqlens: Cumulative lengths tensor of shape (batch_size + 1)
             max_seqlen: Maximum sequence length in the batch. If None, it will be
                 inferred from `culens`.
 
@@ -134,7 +130,7 @@ class PackedSelfAttention(BaseComponent):
 
         out = self._attention_function(
             qkv,
-            cu_seqlens_q=culens,
+            cu_seqlens_q=cu_seqlens,
             max_seqlen_q=max_seqlen,
             flash_attn_kwargs=flash_attention_kwargs,
         )
@@ -144,12 +140,12 @@ class PackedSelfAttention(BaseComponent):
     def _extract_qkv(self, x: PackedTensor) -> PackedMHATensor | PackedQKVTensor:
         if self._qkv_proj.split_qkv:
             # Separate projections for Q, K, V
-            q, k, v = (self._convert_to_headed_layout(x) for x in self._qkv_proj(x))
+            q, k, v = self._qkv_proj(x)
             if self._include_qk_norm:
                 q, k = self._qk_norm(q, k)
             qkv = q, k, v
         else:
-            qkv = self._convert_to_headed_layout(self._qkv_proj(x))
+            qkv = self._convert_to_headed_and_merged_layout(self._qkv_proj(x))
             # Combined projection for Q, K, V
             if self._include_qk_norm:
                 q, k, v = th.unbind(qkv, dim=1)
