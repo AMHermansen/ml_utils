@@ -6,6 +6,7 @@
 """Miscellaneous pytorch utility functions."""
 
 import torch as th
+from torch import nn
 
 from ml_utils.torch_utils.types import CulensTensor
 
@@ -50,3 +51,12 @@ def append_dimensions(x: th.Tensor, target_dimensions: int, dim: int = -1) -> th
 def is_increasing_sequence(cu_seqlens: CulensTensor) -> bool:
     """Check if cu_seqlens represent an increasing sequence."""
     return th.all(th.diff(cu_seqlens) > 0).item()
+
+
+class ParameterNoWeightDecay(nn.Parameter):
+    """A parameter that is excluded from weight decay.
+
+    This only works when used with optimizers from `ml_utils.torch_utils.optimizers`.
+
+    Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
+    """

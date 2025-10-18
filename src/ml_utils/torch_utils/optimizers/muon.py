@@ -14,11 +14,18 @@ We're not using the pytorch implementation for two reasons:
 
 This file is based on the official Muon implementation:
 https://github.com/KellerJordan/Muon
+
+This file also includes code based on:
+https://github.com/mattcleigh/mltools
 """
 
 import torch as th
+from torch import nn
+
+from ml_utils.torch_utils.misc import ParameterNoWeightDecay
 
 
+# Function adapted from: https://github.com/KellerJordan/Muon
 def zeropower_via_newtonschulz5(G, steps: int):
     """Newton-Schulz iteration to compute the zeroth power / orthogonalization of G.
     We opt to use a quintic iteration whose coefficients are selected to maximize the
@@ -52,7 +59,9 @@ def zeropower_via_newtonschulz5(G, steps: int):
     return X
 
 
+# Function adapted from: https://github.com/KellerJordan/Muon
 def muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
+    """Muon update computation."""
     momentum.lerp_(grad, 1 - beta)
     update = grad.lerp_(momentum, beta) if nesterov else momentum
     if update.ndim == 4:  # for the case of conv filters
@@ -61,7 +70,7 @@ def muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
     update *= max(1, grad.size(-2) / grad.size(-1)) ** 0.5
     return update
 
-
+# Function adapted from: https://github.com/KellerJordan/Muon
 def adam_update(grad, buf1, buf2, step, betas, eps):
     buf1.lerp_(grad, 1 - betas[0])
     buf2.lerp_(grad.square(), 1 - betas[1])
@@ -70,6 +79,29 @@ def adam_update(grad, buf1, buf2, step, betas, eps):
     return buf1c / (buf2c.sqrt() + eps)
 
 
+# Heuristic function to make using Muon easier.
+# It might be a good idea to wrap everything except input/output layers into a single
+# Module and then this function can be used to decide whether to use Muon or not for
+# those. While the remaining should not use Muon no matter what.
+# I will have to experiment with this, to figure out how to best use Muon in practice.
+def suitable_for_muon(param: nn.Parameter) -> bool:
+    """A heuristic to determine whether a parameter is suitable for Muon optimization.
+
+    Muon is not recommended for the embedding/first layer or output layers, as well.
+    This cannot be determined here.
+
+    Args:
+        param: The parameter to check.
+
+    Returns:
+        bool: Whether the parameter is suitable for Muon optimization.
+    """
+    if param.dim() < 2:
+        return False
+    return not isinstance(param, ParameterNoWeightDecay)
+
+
+# Class adapted from: https://github.com/KellerJordan/Muon
 class SingleDeviceMuonWithAuxAdam(th.optim.Optimizer):
     """Non-distributed variant of MuonWithAuxAdam."""
 
