@@ -34,7 +34,7 @@ class TransformerEncoder(BaseComponent):
         num_class_tokens: int = 0,
         transformer_config: TransformerEncoderBlockConfig | None = None,
     ):
-        """Transformer Encoder consisting of multiple Transformer Encoder Blocks.
+        """Transformer Encoder consisting of multiple TransformerEncoderBlocks.
 
         Args:
             in_features: Input feature dimension.
