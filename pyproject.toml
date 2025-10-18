@@ -1,0 +1,65 @@
+[project]
+name = "ml-utils"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Andreas Hermansen", email = "mail@andreashermansen.dk" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "jaxtyping>=0.3.2",
+    "lightning>=2.5.5",
+    "torch>=2.8.0",
+    "flash-attn>=2.8.2",
+]
+
+[project.optional-dependencies]
+lion = [
+    "lion-pytorch>=0.2.3",
+]
+[dependency-groups]
+dev = [
+    "hypothesis>=6.140.3",
+    "pyright[nodejs]>=1.1.406",
+    "pytest>=8.4.2",
+    "ruff>=0.14.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.18,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
+
+[tool.uv.extra-build-variables]
+flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
+
+[tool.ruff]
+line-length = 88
+preview = true
+target-version = "py311"
+lint.select = ["ALL", "D212", "D417"]
+lint.ignore = [
+    "ANN002", "PTH123", "S602", "PLC0415", "ANN101", "ANN201", "PLR0911",
+    "E402", "TRY003", "D401", "PLR0913", "PLR2004", "ANN001", "S102", "C901",
+    "D101", "EXE002", "ANN204", "D205", "ISC001", "D105", "ARG002", "SLF001",
+    "DOC501", "DTZ005", "FBT", "N802", "G004", "ANN401", "D102", "N812",
+    "PLR6301", "RUF017", "PLR0914", "TD002", "ERA", "D104", "DTZ007", "CPY001",
+    "BLE001", "FIX", "PLR0917", "T201", "PLR1702", "PLR0912", "S404", "ANN003",
+    "D100", "S105", "EM", "D103", "INP", "N803", "N806", "PLW1514", "PD011",
+    "B905", "ANN202", "COM", "PLR0915", "ARG001", "S311", "RUF015", "TD003",
+    "DOC201", "PD901", "F811", "PLR6104", "TRY002", "S101", "DOC402", "PGH003",
+    "F722",  # Causes issues with jaxtyping
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.ruff.lint.isort]
+known-first-party = ["ml_utils"]
