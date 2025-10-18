@@ -3,7 +3,6 @@ from functools import partial
 import torch as th
 from torch.nn.functional import scaled_dot_product_attention
 
-from ml_utils.components.attention.attention_config import FlashAttentionKWArgs
 from ml_utils.torch_utils import (
     pack_tensors,
     unpack_tensors,
@@ -14,7 +13,10 @@ from ml_utils.torch_utils.types import (
     PackedMHATensor,
 )
 
-from .attention_mask import combine_query_and_key_mask
+from ._utils import (
+    FlashAttentionKWArgs,
+    combine_query_and_key_mask,
+)
 
 
 # Currently bug in pytorch see https://github.com/pytorch/pytorch/issues/149608

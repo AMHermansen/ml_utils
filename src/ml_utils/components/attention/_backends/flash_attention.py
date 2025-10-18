@@ -7,12 +7,13 @@ from flash_attn.flash_attn_interface import (
     flash_attn_varlen_qkvpacked_func,
 )
 
-from ml_utils.components.attention.attention_config import FlashAttentionKWArgs
 from ml_utils.torch_utils.types import (
     AllPackedQKVTypes,
     CulensTensor,
     PackedMHATensor,
 )
+
+from ._utils import FlashAttentionKWArgs
 
 
 def detect_qkv_structure(

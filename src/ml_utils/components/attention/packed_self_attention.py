@@ -15,6 +15,11 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
+from . import FlashAttentionKWArgs
+from ._backends import (
+    common_flash_attention_interface,
+    torch_flash_attention_interface,
+)
 from ._utils import (
     convert_from_headed_layout,
     convert_to_headed_and_qkvmerged_layout,
@@ -23,15 +28,6 @@ from ._utils import (
 from .attention_config import SelfAttentionConfig
 from .qk_norm import QKNorm
 from .qkv_linear import QKVLinear
-from .torch_flash_interface import torch_flash_attention_interface
-
-# Import flash attention can fail if no CUDA
-try:
-    from ._flash import (
-        common_flash_attention_interface,
-    )
-except ImportError:
-    common_flash_attention_interface = torch_flash_attention_interface
 
 
 class PackedSelfAttention(BaseComponent):
@@ -66,7 +62,11 @@ class PackedSelfAttention(BaseComponent):
         self._qkv_bias = config.qkv_bias
         self._qk_norm_type = config.qk_norm_type
         self._include_qk_norm = exists(config.qk_norm_type)
-        self._train_flash_attention_kwargs = config.flash_attention_kwargs
+        self._train_flash_attention_kwargs = (
+            config.flash_attention_kwargs
+            if exists(config.flash_attention_kwargs)
+            else FlashAttentionKWArgs()
+        )
         self._eval_flash_attention_kwargs = replace(
             self._train_flash_attention_kwargs,
             dropout_p=0.0,  # No dropout during evaluation

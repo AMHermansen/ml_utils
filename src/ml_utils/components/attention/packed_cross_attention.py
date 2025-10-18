@@ -13,22 +13,18 @@ from ml_utils.torch_utils.types import (
 )
 from ml_utils.utils import exists
 
+from ._backends import (
+    FlashAttentionKWArgs,
+    common_flash_attention_interface,
+    torch_flash_attention_interface,
+)
 from ._utils import (
     convert_from_headed_layout,
     convert_to_headed_and_kvmerged_layout,
     convert_to_headed_layout,
 )
-from .attention_config import CrossAttentionConfig, FlashAttentionKWArgs
+from .attention_config import CrossAttentionConfig
 from .qk_norm import QKNorm
-from .torch_flash_interface import torch_flash_attention_interface
-
-# Import flash attention can fail if no CUDA
-try:
-    from ._flash import (
-        common_flash_attention_interface,
-    )
-except ImportError:
-    common_flash_attention_interface = torch_flash_attention_interface
 
 
 class PackedCrossAttention(BaseComponent):
