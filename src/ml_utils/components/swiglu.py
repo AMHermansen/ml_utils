@@ -8,15 +8,15 @@ from .base import BaseComponent
 
 
 def swish_gated_linear_unit(
-    tensor: jt.Float[th.Tensor, "... dim"],
-) -> jt.Float[th.Tensor, "... dim // 2"]:
+    tensor: jt.Float[th.Tensor, "... in_features"],
+) -> jt.Float[th.Tensor, "... in_features // 2"]:
     """SwiGLU activation function.
 
     Args:
-        tensor (jt.Float[th.Tensor, "... dim"]): Input tensor of shape (..., dim)
+        tensor (jt.Float[th.Tensor, "... in_features"]): Input tensor of shape (..., in_features)
 
     Returns:
-        jt.Float[th.Tensor, "... dim // 2"]: Output tensor of shape (..., dim // 2)
+        jt.Float[th.Tensor, "... in_features // 2"]: Output tensor of shape (..., in_features // 2)
     """
     x, gate = tensor.chunk(2, dim=-1)
     return x * silu(gate)
@@ -28,37 +28,37 @@ class SwiGLU(nn.Module):
         super().__init__()
 
     def forward(
-        self, tensor: jt.Float[th.Tensor, "... dim"]
-    ) -> jt.Float[th.Tensor, "... (dim//2)"]:  # noqa: F821
+        self, tensor: jt.Float[th.Tensor, "... in_features"]
+    ) -> jt.Float[th.Tensor, "... (in_features//2)"]:  # noqa: F821
         return swish_gated_linear_unit(tensor)
 
 
 class SwiGLUMLP(BaseComponent):
-    def __init__(self, dim: int):
+    def __init__(self, in_features: int):
         """MLP with SwiGLU activation.
 
         Args:
-            dim (int): Input dimension.
+            in_features (int): Number of input features.
         """
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(dim, dim * 2),
+            nn.Linear(in_features, in_features * 2),
             SwiGLU(),
-            nn.Linear(dim, dim),
+            nn.Linear(in_features, in_features),
         )
-        self._dim = dim
+        self._features = in_features
 
     @property
     @override
     def out_features(self) -> int:
-        return self._dim
+        return self._features
 
     @property
     @override
     def in_features(self) -> int:
-        return self._dim
+        return self._features
 
     def forward(
-        self, tensor: jt.Float[th.Tensor, "... dim"]
-    ) -> jt.Float[th.Tensor, "... dim"]:
+        self, tensor: jt.Float[th.Tensor, "... in_features"]
+    ) -> jt.Float[th.Tensor, "... in_features"]:
         return self.net(tensor)
