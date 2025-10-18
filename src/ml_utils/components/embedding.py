@@ -72,12 +72,12 @@ class CosineEmbedding(BaseComponent):
             do_sin: Whether to include sine functions in the embedding.
         """
         super().__init__()
-        self._out_dim = out_dim
         self.register_buffer("min_value", th.tensor(min_value))
         self.register_buffer("max_value", th.tensor(max_value))
         self.register_buffer("range", self.max_value - self.min_value)
 
         freq_dim = out_dim // 2 if do_sin else out_dim
+        self._out_dim = freq_dim
 
         freqs = th.arange(freq_dim).float()
         if scheme in {"exp", "exponential"}:
