@@ -1,9 +1,9 @@
 from .decoder_block import TransformerDecoderBlock, TransformerDecoderBlockConfig
-from .encoder_block import TransformerEncoder, TransformerEncoderBlockConfig
+from .encoder_block import TransformerEncoderBlock, TransformerEncoderBlockConfig
 
 __all__ = [
     "TransformerDecoderBlock",
     "TransformerDecoderBlockConfig",
-    "TransformerEncoder",
+    "TransformerEncoderBlock",
     "TransformerEncoderBlockConfig"
 ]
