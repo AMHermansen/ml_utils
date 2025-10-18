@@ -25,7 +25,7 @@ class TransformerEncoderBlockConfig:
     residual_config: ResidualConfig = field(default_factory=ResidualConfig)
 
 
-class TransformerEncoder(BaseComponent):
+class TransformerEncoderBlock(BaseComponent):
     """Transformer block with self-attention and SwiGLU MLP.
 
     This block consists of a self-attention layer followed by a SwiGLU MLP.
