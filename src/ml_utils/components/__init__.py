@@ -1,5 +1,6 @@
 from .attention import PackedSelfAttention
 from .base import BaseComponent
+from .embedding import CosineEmbedding, FourierEmbedding
 from .swiglu import SwiGLU, SwiGLUMLP
 from .wrappers import (
     DropPath,
@@ -21,4 +22,6 @@ __all__ = [
     "SwiGLU",
     "SwiGLUMLP",
     "Wrapper",
+    "CosineEmbedding",
+    "FourierEmbedding",
 ]
