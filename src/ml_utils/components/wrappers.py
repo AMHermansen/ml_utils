@@ -8,17 +8,29 @@ from torch import nn
 from typing_extensions import override
 
 from ml_utils.torch_utils.misc import append_dimensions
+from ml_utils.utils import exists
 
 from .base import BaseComponent
 
 
 @dataclass(frozen=True)
-class LayerScaleConfig:
-    init_epsilon_value: float = 1e-5
-    init_method: Literal["constant", "uniform"] = "constant"
+class ResidualConfig:
+    """Configuration for residual wrappers.
 
+    Args:
+        norm_name: Name of the normalisation layer to use.
+            One of "layer", "rms", or None. If None, no normalisation is applied.
+        norm_eps: Epsilon value for the normalisation layer.
+        use_layer_scale: Whether to use layer scaling.
+        layer_scale_init_epsilon: Initial value for layer scaling.
+        layer_scale_init_method: Method for initializing layer scaling.
+    """
 
-_SENTINEL_LAYERSCALE_CONFIG = LayerScaleConfig()
+    norm_name: Literal["layer", "rms"] | None = "layer"
+    norm_eps: float = 1e-5
+    use_layer_scale: bool = True
+    layer_scale_init_epsilon: float = 1e-5
+    layer_scale_init_method: Literal["constant", "uniform"] = "uniform"
 
 
 def check_feature_preserving(component: BaseComponent):
@@ -36,7 +48,7 @@ def check_feature_preserving(component: BaseComponent):
         )
 
 
-def setup_layer_scale(config: LayerScaleConfig | None, dim: int) -> nn.Parameter | None:
+def setup_layer_scale(config: ResidualConfig | None, dim: int) -> nn.Parameter | None:
     """Normal setup for layer scaling.
 
     Args:
@@ -48,32 +60,32 @@ def setup_layer_scale(config: LayerScaleConfig | None, dim: int) -> nn.Parameter
     """
     if config is None:
         return None
-    if config.init_method == "constant":
-        return nn.Parameter(config.init_epsilon_value * th.ones(dim))
-    if config.init_method == "uniform":
-        return nn.Parameter(th.empty(dim).uniform_(0, 2 * config.init_epsilon_value))
-    raise ValueError(f"Unknown init_method: {config.init_method}")
+    if config.layer_scale_init_method == "constant":
+        return nn.Parameter(config.layer_scale_init_epsilon * th.ones(dim))
+    if config.layer_scale_init_method == "uniform":
+        return nn.Parameter(th.empty(dim).uniform_(0, 2 * config.layer_scale_init_epsilon))
+    raise ValueError(f"Unknown init_method: {config.layer_scale_init_method}")
 
 
 class Wrapper(BaseComponent):
     """Base class for wrappers around components.
 
     Args:
-        component (BaseComponent): A component with matching input and output dimensions.
+        wrapped_component (BaseComponent): A component with matching input and output dimensions.
     """
 
     def __init__(
         self,
-        component: BaseComponent,
+        wrapped_component: BaseComponent,
     ) -> None:
         """Constructor.
 
         Args:
-            component: A component with matching input and output dimensions.
+            wrapped_component: A component with matching input and output dimensions.
         """
         super().__init__()
-        check_feature_preserving(component)
-        self.wrapped_component = component
+        check_feature_preserving(wrapped_component)
+        self.wrapped_component = wrapped_component
 
     @override
     @property
@@ -109,77 +121,36 @@ class Wrapper(BaseComponent):
 class Residual(Wrapper):
     """Wraps a module with a normalisation layer and residual connection.
 
-    One should generally prefer the PreNormResidual wrapper instead.
-
     Args:
-        component (BaseComponent): The component to wrap.
-        layer_scale_config (LayerScaleConfig | None): Configuration for layer scaling.
-            If None, no layer scaling is applied.
+        component (BaseComponent): Wrapped component.
+        config (ResidualConfig | None): Configuration for residual wrapper.
     """
 
     def __init__(
         self,
         component: BaseComponent,
-        layer_scale_config: LayerScaleConfig | None = _SENTINEL_LAYERSCALE_CONFIG,
-    ) -> None:
-        """Initialises the Residual module.
-
-        Args:
-            component: Wrapped component.
-            layer_scale_config: Configuration for layer scaling. If None, no layer scaling is applied.
-        """
-        super().__init__(component)
-        self._layer_scale_config = layer_scale_config
-        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_features)
-
-    def forward(
-        self,
-        x: jt.Float[th.Tensor, "*batches dim"],
-        *args,
-        **kwargs,
-    ) -> jt.Float[th.Tensor, "*batches dim"]:
-        if self.has_layer_scale:
-            return x + self.layer_scale * self.wrapped_component(x, *args, **kwargs)
-        return x + self.wrapped_component(x, *args, **kwargs)
-
-    @property
-    def has_layer_scale(self) -> bool:
-        """Whether layer scaling is applied."""
-        return self.layer_scale is not None
-
-    def __repr__(self) -> str:
-        return f"Residual-{self.wrapped_component}"
-
-
-class PreNormResidual(Wrapper):
-    """Wraps a module with a normalisation layer and residual connection."""
-
-    def __init__(
-        self,
-        component: BaseComponent,
-        norm_name: Literal["layer", "rms"],
-        eps: float = 1e-5,
-        layer_scale_config: LayerScaleConfig | None = _SENTINEL_LAYERSCALE_CONFIG,
+        config: ResidualConfig | None = None,
     ) -> None:
         """Initialises the PreNormResidual module.
 
         Args:
             component: Wrapped component.
-            norm_name: Type of normalization to use ("layer" for LayerNorm, "rms" for RMSNorm).
-            eps: Epsilon value for numerical stability in normalization.
-            layer_scale_config: Configuration for layer scaling. If None, no layer scaling is applied.
+            config: Configuration for residual wrapper.
         """
         super().__init__(component)
-        self._layer_scale_config = layer_scale_config
-        if norm_name == "layer":
+        config = config if exists(config) else ResidualConfig()
+        self._config = config
+        if config.norm_name == "layer":
             self.norm = nn.LayerNorm(
-                self.in_features, elementwise_affine=False, eps=eps
+                self.in_features, elementwise_affine=False, eps=config.norm_eps
             )
-        elif norm_name == "rms":
-            self.norm = nn.RMSNorm(self.in_features, elementwise_affine=False, eps=eps)
+        elif config.norm_name == "rms":
+            self.norm = nn.RMSNorm(self.in_features, elementwise_affine=False, eps=config.norm_eps)
+        elif not exists(config.norm_name):
+            self.norm = nn.Identity()
         else:
-            raise ValueError(f"Unknown norm_name: {norm_name}")
-        self.layer_scale = setup_layer_scale(layer_scale_config, self.out_features)
+            raise ValueError(f"Unknown norm_name: {config.norm_name}")
+        self.layer_scale = setup_layer_scale(config, self.out_features)
 
     def __repr__(self) -> str:
         return f"Residual-{self.wrapped_component}"
@@ -213,39 +184,39 @@ class ResidualWithContext(Wrapper):
         self,
         component: BaseComponent,
         context_dim: int,
-        layer_scale_config: LayerScaleConfig | None = _SENTINEL_LAYERSCALE_CONFIG,
+        config: ResidualConfig | None = None,
     ) -> None:
         """Initialises the ResidualWithContext module.
 
         Args:
             component: Wrapped component.
             context_dim: Dimension of the context vector.
-            layer_scale_config: Configuration for layer scaling. If None, no layer
-                scaling is applied.
+            config: Configuration for residual wrapper.
         """
         super().__init__(component)
         if context_dim <= 0:
             raise ValueError(f"context_dim must be positive: {context_dim}")
+        config = config if exists(config) else ResidualConfig()
         self._context_dim = context_dim
-        self._layer_scale_config = layer_scale_config
-        self._setup_layer_scale(layer_scale_config)
+        self._config = config
+        self._setup_layer_scale(config)
 
         self.norm = nn.LayerNorm(self.in_features, elementwise_affine=False)
         self.scale = nn.Linear(context_dim, self.out_features)
         self.shift = nn.Linear(context_dim, self.out_features)
         self.reset_parameters()
 
-    def _setup_layer_scale(self, layer_scale_config: LayerScaleConfig | None) -> None:
+    def _setup_layer_scale(self, config: ResidualConfig) -> None:
         self.layer_scale_gate = (
             nn.Linear(self._context_dim, self.out_features)
-            if layer_scale_config
+            if config.use_layer_scale
             else nn.Identity()
         )
 
     @property
     def has_layer_scale(self) -> bool:
         """Whether layer scaling is applied."""
-        return self._layer_scale_config is not None
+        return self._config.use_layer_scale
 
     @property
     def context_dim(self) -> int:
@@ -259,21 +230,23 @@ class ResidualWithContext(Wrapper):
         self.shift.bias.data.zero_()
         if self.has_layer_scale:
             assert isinstance(self.layer_scale_gate, nn.Linear)
-            if self._layer_scale_config.init_method == "constant":
-                self.layer_scale_gate.weight.data.zero_()
-                self.layer_scale_gate.bias.data.fill_(
-                    self._layer_scale_config.init_epsilon_value
+            if self._config.layer_scale_init_method == "constant":
+                self.layer_scale_gate.weight.data.fill_(
+                    self._config.layer_scale_init_epsilon
                 )
-            elif self._layer_scale_config.init_method == "uniform":
+                self.layer_scale_gate.bias.data.fill_(
+                    self._config.layer_scale_init_epsilon
+                )
+            elif self._config.layer_scale_init_method == "uniform":
                 self.layer_scale_gate.weight.data.uniform_(
-                    0, self._layer_scale_config.init_epsilon_value
+                    0, 2 * self._config.layer_scale_init_epsilon
                 )
                 self.layer_scale_gate.bias.data.uniform_(
-                    0, self._layer_scale_config.init_epsilon_value
+                    0, 2 * self._config.layer_scale_init_epsilon
                 )
             else:
                 raise ValueError(
-                    f"Unknown init_method: {self._layer_scale_config.init_method}"
+                    f"Unknown init_method: {self._config.layer_scale_init_method}"
                 )
 
     def __repr__(self) -> str:

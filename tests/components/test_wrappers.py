@@ -6,8 +6,8 @@ from hypothesis import strategies as st
 
 from ml_utils.components import (
     DropPath,
-    PreNormResidual,
     Residual,
+    ResidualConfig,
     ResidualWithContext,
     SwiGLUMLP,
 )
@@ -54,7 +54,7 @@ def test_prenorm_residual_forward_shape(shape, norm_name: Literal["layer", "rms"
     tensor = th.randn(*shape)
     dim = shape[-1]
     mlp = SwiGLUMLP(dim)
-    wrapper = PreNormResidual(mlp, norm_name=norm_name)
+    wrapper = Residual(mlp, ResidualConfig(norm_name=norm_name))
     out = wrapper(tensor)
     assert out.shape == tensor.shape
 

@@ -4,24 +4,22 @@ from .embedding import CosineEmbedding, FourierEmbedding
 from .swiglu import SwiGLU, SwiGLUMLP
 from .wrappers import (
     DropPath,
-    LayerScaleConfig,
-    PreNormResidual,
     Residual,
+    ResidualConfig,
     ResidualWithContext,
     Wrapper,
 )
 
 __all__ = [
     "BaseComponent",
+    "CosineEmbedding",
     "DropPath",
-    "LayerScaleConfig",
+    "FourierEmbedding",
     "PackedSelfAttention",
-    "PreNormResidual",
     "Residual",
+    "ResidualConfig",
     "ResidualWithContext",
     "SwiGLU",
     "SwiGLUMLP",
     "Wrapper",
-    "CosineEmbedding",
-    "FourierEmbedding",
 ]
