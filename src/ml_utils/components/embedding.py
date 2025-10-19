@@ -48,6 +48,9 @@ class FourierEmbedding(BaseComponent):
             x.dtype
         ) + math.sqrt(2)
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(num_frequencies={self.num_frequencies})"
+
 
 class CosineEmbedding(BaseComponent):
     def __init__(
