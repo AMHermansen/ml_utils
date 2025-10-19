@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import torch as th
 from torch import nn
 from typing_extensions import override
@@ -14,6 +16,20 @@ from ml_utils.utils import exists, maybe_add, maybe_subtract
 from .decoder_block import TransformerDecoderBlock, TransformerDecoderBlockConfig
 
 
+@dataclass
+class TransformerDecoderConfig:
+    """Configuration for the full Transformer Decoder.
+
+    Args:
+        num_layers: Number of TransformerDecoderBlocks.
+        num_registers: Number of register tokens to prepend to the input.
+        transformer_config: Configuration for each TransformerDecoderBlock.
+    """
+    num_layers: int = 6,
+    num_registers: int = 0,
+    transformer_config: TransformerDecoderBlockConfig | None = None,
+
+
 class TransformerDecoder(BaseComponent):
     """Transformer Decoder consisting of multiple TransformerDecoderBlocks.
 
@@ -23,43 +39,34 @@ class TransformerDecoder(BaseComponent):
 
     Args:
         in_features: Input feature dimension.
-        num_layers: Number of TransformerDecoderBlocks.
-        num_registers: Number of register tokens to prepend to the input.
-        transformer_config: Configuration for each TransformerDecoderBlock.
+        config: Configuration for the Transformer Decoder.
     """
     def __init__(
         self,
         in_features: int,
-        num_layers: int,
-        num_registers: int = 0,
-        transformer_config: TransformerDecoderBlockConfig | None = None,
+        config: TransformerDecoderConfig | None = None,
     ):
         """Transformer Decoder consisting of multiple TransformerDecoderBlocks.
 
         Args:
             in_features: Input feature dimension.
-            num_layers: Number of TransformerDecoderBlocks.
-            num_registers: Number of register tokens to prepend to the input.
-            transformer_config: Configuration for each TransformerDecoderBlock.
+            config: Configuration for the Transformer Decoder.
         """
-        transformer_config = (
-            transformer_config
-            if exists(transformer_config)
-            else TransformerDecoderBlockConfig()
-        )
+        config = config if exists(config) else TransformerDecoderConfig()
         super().__init__()
+        self._config = config
         self._in_features = in_features
-        self._num_layers = num_layers
-        self._num_registers = num_registers
-        self._config = transformer_config
+        self._num_layers = config.num_layers
+        self._num_registers = config.num_registers
+        self._transformer_config = config.transformer_config
 
         self.layers = nn.ModuleList(
             [
                 TransformerDecoderBlock(
                     in_features=in_features,
-                    config=transformer_config,
+                    config=config.transformer_config,
                 )
-                for _ in range(num_layers)
+                for _ in range(config.num_layers)
             ]
         )
 

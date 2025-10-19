@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 import torch as th
 from torch import nn
 from typing_extensions import override
@@ -14,53 +16,58 @@ from ml_utils.utils import exists, maybe_add, maybe_subtract
 from .encoder_block import TransformerEncoderBlock, TransformerEncoderBlockConfig
 
 
+@dataclass
+class TransformerEncoderConfig:
+    """Configuration for the full Transformer Encoder.
+
+    Args:
+        num_layers: Number of Transformer Encoder Blocks.
+        num_registers: Number of learnable register tokens to prepend to the input.
+            0 means no registers are used. Default is 0. Registers are similar to
+            class tokens. But they are not part of the returned output.
+        num_class_tokens: Number of class tokens to prepend to the input. Class
+            tokens are returned as part of the output. Default is 0.
+            If num_class_tokens > 0, then the returned output will contain more
+            tokens than the input (by num_class_tokens * batch_size).
+        transformer_config: Configuration for each Transformer Encoder Block.
+            If None, default configuration is used.
+            See `TransformerEncoderBlockConfig` for details.
+    """
+
+    num_layers: int = 6
+    num_registers: int = 0
+    num_class_tokens: int = 0
+    transformer_config: TransformerEncoderBlockConfig = field(default_factory=TransformerEncoderBlockConfig)
+
+
 class TransformerEncoder(BaseComponent):
     """Transformer Encoder consisting of multiple Transformer Encoder Blocks.
 
     Args:
         in_features: Input feature dimension.
-        num_layers: Number of Transformer Encoder Blocks.
-        num_registers: Number of learnable register tokens to prepend to the input.
-        0 means no registers are used. Default is 0.
-        transformer_config: Configuration for each Transformer Encoder Block.
-            If None, default configuration is used.
-            See `TransformerEncoderBlockConfig` for details.
+        config: Configuration for the Transformer Encoder. See
+            `TransformerEncoderConfig`, for details.
     """
     def __init__(
         self,
         in_features: int,
-        num_layers: int,
-        num_registers: int = 0,
-        num_class_tokens: int = 0,
-        transformer_config: TransformerEncoderBlockConfig | None = None,
+        config: TransformerEncoderConfig | None = None
     ):
         """Transformer Encoder consisting of multiple TransformerEncoderBlocks.
 
         Args:
             in_features: Input feature dimension.
-            num_layers: Number of Transformer Encoder Blocks.
-            num_registers: Number of learnable register tokens to prepend to the input.
-                0 means no registers are used. Default is 0. Registers are similar to
-                class tokens. But they are not part of the returned output.
-            num_class_tokens: Number of class tokens to prepend to the input. Class
-                tokens are returned as part of the output. Default is 0.
-                If num_class_tokens > 0, then the returned output will contain more
-                tokens than the input (by num_class_tokens * batch_size).
-            transformer_config: Configuration for each Transformer Encoder Block.
-                If None, default configuration is used.
-                See `TransformerEncoderBlockConfig` for details.
+            config: Configuration for the Transformer Encoder. See
+                `TransformerEncoderConfig`, for details.
         """
         super().__init__()
-        transformer_config = (
-            transformer_config
-            if exists(transformer_config)
-            else TransformerEncoderBlockConfig()
-        )
+        config = config if exists(config) else TransformerEncoderConfig()
+        self._config = config
         self._in_features = in_features
-        self._num_layers = num_layers
-        self._num_registers = num_registers
-        self._num_class_tokens = num_class_tokens
-        self._transformer_config = transformer_config
+        self._num_layers = config.num_layers
+        self._num_registers = config.num_registers
+        self._num_class_tokens = config.num_class_tokens
+        self._transformer_config = config.transformer_config
 
         self._layers = nn.ModuleList(
             [
