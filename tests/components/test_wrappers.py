@@ -5,7 +5,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from ml_utils.components import (
-    DropPath,
     Residual,
     ResidualConfig,
     ResidualWithContext,
@@ -71,19 +70,4 @@ def test_residual_with_context_forward_shape(shape, context_dim):
     mlp = SwiGLUMLP(dim)
     wrapper = ResidualWithContext(mlp, context_dim=context_dim)
     out = wrapper(tensor, context=context)
-    assert out.shape == tensor.shape
-
-
-@given(
-    shape=random_shape_strategy(),
-    drop_prob=st.floats(min_value=0.0, max_value=1.0),
-)
-@settings(deadline=10000)
-def test_droppath_forward_shape(shape, drop_prob):
-    tensor = th.randn(*shape)
-    dim = shape[-1]
-    mlp = SwiGLUMLP(dim)
-    wrapper = DropPath(mlp, drop_prob=drop_prob)
-    wrapper.train()
-    out = wrapper(tensor)
     assert out.shape == tensor.shape

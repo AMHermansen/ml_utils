@@ -8,6 +8,11 @@ from torch import nn
 from typing_extensions import override
 
 from ml_utils.torch_utils.misc import append_dimensions
+from ml_utils.torch_utils.types import (
+    CulensTensor,
+    GeneralBatchedTensor,
+    GeneralPackedTensor,
+)
 from ml_utils.utils import exists
 
 from .base import BaseComponent
@@ -31,6 +36,8 @@ class ResidualConfig:
     use_layer_scale: bool = True
     layer_scale_init_epsilon: float = 1e-5
     layer_scale_init_method: Literal["constant", "uniform"] = "uniform"
+    drop_path_rate: float = 0.0
+    input_format: Literal["packed", "unpacked"] = "packed"
 
 
 def check_feature_preserving(component: BaseComponent):
@@ -168,7 +175,7 @@ class Residual(Wrapper):
     """
     _base_local_attrs: ClassVar[set[str]] = (
         Wrapper._base_local_attrs
-        | {"norm", "layer_scale", "_config"}
+        | {"norm", "layer_scale", "_config", "drop_path_rate", "input_format"}
     )
 
     def __init__(
@@ -185,6 +192,8 @@ class Residual(Wrapper):
         super().__init__(component)
         config = config if exists(config) else ResidualConfig()
         self._config = config
+        self.drop_path_rate = config.drop_path_rate
+        self.input_format = config.input_format
         if config.norm_name == "layer":
             self.norm = nn.LayerNorm(
                 self.in_features, elementwise_affine=False, eps=config.norm_eps
@@ -328,52 +337,74 @@ class ResidualWithContext(Wrapper):
         return x + self.wrapped_component(tmp, *args, **kwargs) * gate
 
 
-class DropPath(Wrapper):
-    """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
-
-    Reference: `Deep Networks with Stochastic Depth` - https://arxiv.org/abs/1603.09382.
+def get_drop_sample(
+    keep_prob: float,
+    batch_size: int,
+    device: th.device,
+    dtype: th.dtype,
+):
+    """Generates a mask signifying which samples to drop.
 
     Args:
-        component (BaseComponent): The component to apply DropPath to.
-        drop_prob (float): Probability of an element to be zeroed. Default: 0.0
+        keep_prob: Probability of an element to be kept.
+        batch_size: Size of the batch.
+        device: device to create the mask on.
+        dtype: dtype of the mask.
+
+    Returns:
+        A tensor of shape (batch_size,) with 1s for kept samples and 0s for dropped
+        samples.
     """
-    _base_local_attrs: ClassVar[set[str]] = Wrapper._base_local_attrs | {"drop_prob"}
+    random_tensor = th.rand(batch_size, device=device, dtype=dtype)
+    return (random_tensor < keep_prob).to(dtype)
 
-    def __init__(self, component: BaseComponent, drop_prob: float = 0.0) -> None:
-        """Constructor for DropPath.
 
-        Args:
-            component: The component to apply DropPath to.
-            drop_prob: Probability of an element to be zeroed. Default: 0.0
-        """
-        super().__init__(component)
-        self.drop_prob = drop_prob
+def apply_batched_drop_path(
+    output: GeneralBatchedTensor,
+    drop_prob: float,
+):
+    """Applies DropPath to the output tensor.
 
-    @override
-    def forward(
-        self, x: jt.Float[th.Tensor, "*batches dim"], *args, **kwargs
-    ) -> jt.Float[th.Tensor, "*batches dim"]:
-        """Randomly drops the wrapped component's output during training.
+    Randomly drops entire samples in the batch with probability `drop_prob`.
 
-        Args:
-            x: Input tensor of shape `(*batches, dim)`
-            *args: Additional positional arguments to pass to the wrapped component.
-            **kwargs: Additional keyword arguments to pass to the wrapped component.
+    Args:
+        output: Output tensor of shape (batch_size, ...).
+        drop_prob: Probability of an element to be zeroed.
 
-        Returns:
-            Output tensor of shape `(*batches, dim)`
+    Returns:
+        Tensor after applying DropPath.
+    """
+    keep_prob = 1 - drop_prob
+    dropped = get_drop_sample(keep_prob, output.shape[0], output.device, output.dtype)
+    dropped = append_dimensions(dropped, output.dim())
+    return output.div(keep_prob) * dropped
 
-        """
-        if self.drop_prob == 0.0 or not self.training:
-            return self.wrapped_component(x, *args, **kwargs)
-        keep_prob = 1 - self.drop_prob
-        random_tensor = th.rand(x.shape[0], device=x.device, dtype=x.dtype)
-        dropped = (random_tensor < keep_prob).to(x.dtype)
-        dropped = append_dimensions(dropped, x.dim())
-        output = self.wrapped_component(x, *args, **kwargs)
-        return output.div(keep_prob) * dropped
 
-    @override
-    @property
-    def _local_attrs(self) -> set[str]:
-        return self._base_local_attrs
+# This function technically needs the lengths and not the cumulative lengths,
+# but since most other functions / classes use cumulative lengths, we keep it
+# consistent, at the cost of a (probably very minor) inefficiency.
+# If one aims to optimize this for efficiency, one could store the lengths at beginning
+# of forward pass in class, and then refactor this to take lengths directly.
+def apply_packed_drop_path(
+    output: GeneralPackedTensor,
+    cu_seqlens: CulensTensor,
+    drop_prob: float,
+):
+    """Applies DropPath to packed sequences.
+
+    Args:
+        output: Output tensor of shape (total_length, ...).
+        cu_seqlens: Cumulative sequence lengths tensor. Shape (batch_size + 1,).
+        drop_prob: Probability of a sequence to be zeroed.
+
+    Returns:
+        Tensor after applying DropPath.
+    """
+    keep_prob = 1 - drop_prob
+    dropped = get_drop_sample(
+        keep_prob, cu_seqlens.shape[0] - 1, output.device, output.dtype
+    )
+    # repeating according to sequence lengths
+    dropped = th.repeat_interleave(dropped, th.diff(cu_seqlens), dim=0)
+    dropped = append_dimensions(dropped, output.dim())
+    return output.div(keep_prob) * dropped
