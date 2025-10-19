@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch as th
 from torch import nn
@@ -25,9 +25,9 @@ class TransformerDecoderConfig:
         num_registers: Number of register tokens to prepend to the input.
         transformer_config: Configuration for each TransformerDecoderBlock.
     """
-    num_layers: int = 6,
-    num_registers: int = 0,
-    transformer_config: TransformerDecoderBlockConfig | None = None,
+    num_layers: int = 6
+    num_registers: int = 0
+    transformer_config: TransformerDecoderBlockConfig = field(default_factory=TransformerDecoderBlockConfig)
 
 
 class TransformerDecoder(BaseComponent):
@@ -44,7 +44,7 @@ class TransformerDecoder(BaseComponent):
     def __init__(
         self,
         in_features: int,
-        config: TransformerDecoderConfig | None = None,
+        config: TransformerDecoderConfig,
     ):
         """Transformer Decoder consisting of multiple TransformerDecoderBlocks.
 

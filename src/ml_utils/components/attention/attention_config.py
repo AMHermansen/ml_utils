@@ -43,7 +43,7 @@ class CrossAttentionConfig:
         flash_attention_kwargs: Additional keyword arguments for flash attention.
         use_flash_attention: Whether to use flash attention or standard attention.
     """
-    nheads: int = 8,
+    nheads: int = 8
     kv_in_dim: int | None = None
     q_bias: bool = False
     kv_bias: bool = False

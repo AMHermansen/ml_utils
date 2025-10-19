@@ -51,7 +51,7 @@ class TransformerEncoder(BaseComponent):
     def __init__(
         self,
         in_features: int,
-        config: TransformerEncoderConfig | None = None
+        config: TransformerEncoderConfig
     ):
         """Transformer Encoder consisting of multiple TransformerEncoderBlocks.
 

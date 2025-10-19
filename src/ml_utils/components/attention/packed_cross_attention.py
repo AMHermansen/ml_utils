@@ -52,7 +52,7 @@ class PackedCrossAttention(BaseComponent):
         self._kv_in_dim = config.kv_in_dim if exists(config.kv_in_dim) else in_features
         self._q_bias = config.q_bias
         self._kv_bias = config.kv_bias
-        self._use_qk_norm = exists(config.qk_norm_type)
+        self._include_qk_norm = exists(config.qk_norm_type)
         self._qk_norm_type = config.qk_norm_type
         self._use_flash_attention = config.use_flash_attention
 
