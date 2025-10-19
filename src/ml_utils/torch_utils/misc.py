@@ -50,7 +50,7 @@ def append_dimensions(x: th.Tensor, target_dimensions: int, dim: int = -1) -> th
 
 def is_increasing_sequence(cu_seqlens: CulensTensor) -> bool:
     """Check if cu_seqlens represent an increasing sequence."""
-    return th.all(th.diff(cu_seqlens) > 0).item()
+    return th.all(th.diff(cu_seqlens) >= 0).item()
 
 
 class ParameterNoWeightDecay(nn.Parameter):
