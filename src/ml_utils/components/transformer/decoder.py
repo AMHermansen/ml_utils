@@ -15,6 +15,18 @@ from .decoder_block import TransformerDecoderBlock, TransformerDecoderBlockConfi
 
 
 class TransformerDecoder(BaseComponent):
+    """Transformer Decoder consisting of multiple TransformerDecoderBlocks.
+
+    This is not an autoregressive transformer. This module takes in a
+    primary input sequence (q_sequence) and a conditioning sequence
+    (kv_sequence) and processes them through multiple decoder blocks.
+
+    Args:
+        in_features: Input feature dimension.
+        num_layers: Number of TransformerDecoderBlocks.
+        num_registers: Number of register tokens to prepend to the input.
+        transformer_config: Configuration for each TransformerDecoderBlock.
+    """
     def __init__(
         self,
         in_features: int,
