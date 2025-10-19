@@ -154,6 +154,10 @@ class TestWrapper:
             def forward(self, x, *args, **kwargs):
                 return self.wrapped_component.weight @ x + self.wrapped_component.bias
 
+            @property
+            def _local_attrs(self) -> set[str]:
+                return self._base_local_attrs
+
         wrapper = ConcreteWrapper(component)
 
         # Test attribute access

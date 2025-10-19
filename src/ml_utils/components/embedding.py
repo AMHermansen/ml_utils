@@ -76,8 +76,11 @@ class CosineEmbedding(BaseComponent):
         self.register_buffer("max_value", th.tensor(max_value))
         self.register_buffer("range", self.max_value - self.min_value)
 
+        if do_sin and out_dim % 2 != 0:
+            raise ValueError("out_dim must be even when do_sin is True.")
+
         freq_dim = out_dim // 2 if do_sin else out_dim
-        self._out_dim = freq_dim
+        self._freq_dim = freq_dim
 
         freqs = th.arange(freq_dim).float()
         if scheme in {"exp", "exponential"}:
@@ -94,7 +97,7 @@ class CosineEmbedding(BaseComponent):
     @override
     @property
     def out_features(self) -> int:
-        return self._out_dim
+        return self._freq_dim * (2 if self.do_sin else 1)
 
     @override
     @property

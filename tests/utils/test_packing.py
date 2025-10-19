@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch as th
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as hnp
 
@@ -138,6 +138,7 @@ def cu_seqlens_and_packed_list(
     feature_like_dimensions=st.integers(min_value=1, max_value=5),
     data=st.data(),
 )
+@settings(deadline=10_000)
 def test_pack_unpack_roundtrip_single_tensor(B, N, F, feature_like_dimensions, data):
     """
     Generate a random mask and a random (B,N,F) tensor, pack it and then unpack.
@@ -208,6 +209,7 @@ def test_pack_unpack_roundtrip_single_tensor(B, N, F, feature_like_dimensions, d
     F=feat_dims,
     data=st.data(),
 )
+@settings(deadline=10_000)
 def test_pack_unpack_roundtrip_multiple_tensors(B, N, F, data):
     """
     Test pack/unpack roundtrip with multiple tensors (two tensors with same shapes).

@@ -146,6 +146,8 @@ class TestCosineEmbedding:
     @settings(max_examples=50)
     def test_properties(self, out_dim, scheme, do_sin):
         """Test in_features and out_features properties."""
+        if do_sin and out_dim % 2 != 0:
+            out_dim += 1
         embedding = CosineEmbedding(
             out_dim=out_dim,
             scheme=scheme,

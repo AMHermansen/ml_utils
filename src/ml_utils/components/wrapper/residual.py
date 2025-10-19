@@ -144,7 +144,7 @@ class Residual(Wrapper):
             self.training,
         )
 
-        if self._config.input_format == "packed":
+        if self._config.input_format == "packed" and self.drop_path_rate > 0.0:
             assert "cu_seqlens" in kwargs, (
                 "cu_seqlens must be provided for packed input format."
             )
@@ -291,7 +291,7 @@ class ResidualWithContext(Wrapper):
             self.dropout_rate,
             self.training,
         )
-        if self._config.input_format == "packed":
+        if self._config.input_format == "packed" and self.drop_path_rate > 0.0:
             assert "cu_seqlens" in kwargs, (
                 "cu_seqlens must be provided for packed input format."
             )
