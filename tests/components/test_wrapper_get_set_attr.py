@@ -1,7 +1,10 @@
 import pytest
 import torch
+from typing_extensions import override
 
-from ml_utils.components import BaseComponent, SwiGLUMLP, Wrapper
+from ml_utils.components import SwiGLUMLP
+from ml_utils.components.base import BaseComponent
+from ml_utils.components.wrapper.base import Wrapper
 
 
 class MockWrapper(Wrapper):
@@ -9,6 +12,11 @@ class MockWrapper(Wrapper):
 
     def forward(self, x, *args, **kwargs):
         return self.wrapped_component.forward(x, *args, **kwargs)
+
+    @override
+    @property
+    def _local_attrs(self) -> set[str]:
+        return self._base_local_attrs
 
 
 class Mock(BaseComponent):

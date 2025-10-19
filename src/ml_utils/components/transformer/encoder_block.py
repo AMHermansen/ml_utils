@@ -3,10 +3,10 @@ from typing import Literal
 
 from typing_extensions import override
 
+from ml_utils.components import Residual, ResidualConfig
 from ml_utils.components.attention import PackedSelfAttention, SelfAttentionConfig
 from ml_utils.components.base import BaseComponent
 from ml_utils.components.swiglu import SwiGLUMLP
-from ml_utils.components.wrappers import Residual, ResidualConfig
 from ml_utils.torch_utils.types import CulensTensor, PackedTensor
 from ml_utils.utils import exists
 

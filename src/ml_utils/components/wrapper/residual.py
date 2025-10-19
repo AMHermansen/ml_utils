@@ -1,21 +1,20 @@
-from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 import jaxtyping as jt
 import torch as th
 from torch import nn
 from typing_extensions import override
 
+from ml_utils.components.base import BaseComponent
 from ml_utils.torch_utils.misc import append_dimensions
-from ml_utils.torch_utils.types import (
-    CulensTensor,
-    GeneralBatchedTensor,
-    GeneralPackedTensor,
-)
 from ml_utils.utils import exists
 
-from .base import BaseComponent
+from .base import Wrapper
+from .drop import (
+    maybe_apply_dropout,
+    maybe_apply_stochastic_depth,
+)
 
 
 @dataclass(frozen=True)
@@ -38,21 +37,7 @@ class ResidualConfig:
     layer_scale_init_method: Literal["constant", "uniform"] = "uniform"
     drop_path_rate: float = 0.0
     input_format: Literal["packed", "unpacked"] = "packed"
-
-
-def check_feature_preserving(component: BaseComponent):
-    """Check if a component is feature-preserving.
-
-    Args:
-        component: A component to check.
-
-    Raises:
-        ValueError: If the component is not shape-preserving.
-    """
-    if component.in_features != component.out_features:
-        raise ValueError(
-            f"Component {component} is not feature-preserving: in_dim={component.in_features}, out_dim={component.out_features}"
-        )
+    dropout_rate: float = 0.0
 
 
 def setup_layer_scale(config: ResidualConfig | None, dim: int) -> nn.Parameter | None:
@@ -74,98 +59,6 @@ def setup_layer_scale(config: ResidualConfig | None, dim: int) -> nn.Parameter |
     raise ValueError(f"Unknown init_method: {config.layer_scale_init_method}")
 
 
-class Wrapper(BaseComponent):
-    """Base class for wrappers around components.
-
-    When this is subclassed, it is very important to include all local attributes
-    in the `_base_local_attrs` set to avoid infinite recursion in `__getattr__
-    and `__setattr__`.
-
-    Args:
-        wrapped_component (BaseComponent): A component with matching input and output
-            dimensions.
-    """
-
-    # It is EXTREMELY important that all local attributes are included here to avoid
-    # infinite recursion in __getattr__ and __setattr__.
-    _base_local_attrs: ClassVar[set[str]] = {"wrapped_component"}
-
-    def __init__(
-        self,
-        wrapped_component: BaseComponent,
-    ) -> None:
-        """Constructor.
-
-        Args:
-            wrapped_component: A component with matching input and output dimensions.
-        """
-        super().__init__()
-        check_feature_preserving(wrapped_component)
-        self.wrapped_component = wrapped_component
-
-    @override
-    @property
-    def in_features(self) -> int:
-        """Input dimension of this module."""
-        return self.wrapped_component.in_features
-
-    @override
-    @property
-    def out_features(self) -> int:
-        """Input dimension of this module."""
-        return self.wrapped_component.out_features
-
-    # We're making this abstract to get additional confirmation that subclasses
-    # are including their local attributes in _base_local_attrs.
-    @property
-    @abstractmethod
-    def _local_attrs(self) -> set[str]:
-        return self._base_local_attrs
-
-    @abstractmethod
-    def forward(
-        self,
-        x: jt.Float[th.Tensor, "*batches dim"],
-        *args,
-        **kwargs,
-    ) -> jt.Float[th.Tensor, "*batches dim"]:
-        """Applies a wrapping effect around the wrapped component.
-
-        Args:
-            x: input tensor of shape `(*batches, dim)`
-            *args: additional positional arguments to pass to the wrapped component
-            **kwargs: additional keyword arguments to pass to the wrapped component
-
-        Returns:
-            Output tensor of shape `(*batches, dim)`
-        """
-
-    # Moderately cursed python, to delegate attribute access to the wrapped components.
-    # This makes it much cleaner to interact with the wrapped component's attributes.
-    def __getattr__(self, item: str) -> Any:
-        """Delegate attribute access to the wrapped component if not found.
-
-        Args:
-            item: Attribute name.
-
-        Returns:
-            Attribute value.
-        """
-        try:
-            return super().__getattr__(item)
-        except AttributeError:
-            return getattr(self.wrapped_component, item)
-
-    def __setattr__(self, key: str, value: Any) -> None:
-        """Delegate attribute setting to the wrapped component if not found."""
-        local_attrs = self._local_attrs
-
-        if key in local_attrs or not hasattr(self, "wrapped_component"):
-            super().__setattr__(key, value)
-        else:
-            setattr(self.wrapped_component, key, value)
-
-
 class Residual(Wrapper):
     """Wraps a module with a normalisation layer and residual connection.
 
@@ -175,7 +68,14 @@ class Residual(Wrapper):
     """
     _base_local_attrs: ClassVar[set[str]] = (
         Wrapper._base_local_attrs
-        | {"norm", "layer_scale", "_config", "drop_path_rate", "input_format"}
+        | {
+            "_config",
+            "norm",
+            "layer_scale",
+            "drop_path_rate",
+            "input_format",
+            "dropout_rate",
+        }
     )
 
     def __init__(
@@ -193,13 +93,20 @@ class Residual(Wrapper):
         config = config if exists(config) else ResidualConfig()
         self._config = config
         self.drop_path_rate = config.drop_path_rate
+        self.dropout_rate = config.dropout_rate
         self.input_format = config.input_format
         if config.norm_name == "layer":
             self.norm = nn.LayerNorm(
-                self.in_features, elementwise_affine=False, eps=config.norm_eps
+                self.in_features,
+                elementwise_affine=False,
+                eps=config.norm_eps,
             )
         elif config.norm_name == "rms":
-            self.norm = nn.RMSNorm(self.in_features, elementwise_affine=False, eps=config.norm_eps)
+            self.norm = nn.RMSNorm(
+                self.in_features,
+                elementwise_affine=False,
+                eps=config.norm_eps
+            )
         elif not exists(config.norm_name):
             self.norm = nn.Identity()
         else:
@@ -229,7 +136,35 @@ class Residual(Wrapper):
             return x + self.layer_scale * self.wrapped_component(
                 self.norm(x), *args, **kwargs
             )
-        return x + self.wrapped_component(self.norm(x), *args, **kwargs)
+        out = self.wrapped_component(self.norm(x), *args, **kwargs)
+
+        out = maybe_apply_dropout(
+            out,
+            self.dropout_rate,
+            self.training,
+        )
+
+        if self._config.input_format == "packed":
+            assert "cu_seqlens" in kwargs, (
+                "cu_seqlens must be provided for packed input format."
+            )
+            cu_seqlens = kwargs["cu_seqlens"]
+            out = maybe_apply_stochastic_depth(
+                out,
+                cu_seqlens,
+                self.drop_path_rate,
+                self.training,
+                self.input_format,
+            )
+        else:
+            out = maybe_apply_stochastic_depth(
+                out,
+                None,
+                self.drop_path_rate,
+                self.training,
+                self.input_format,
+            )
+        return x + out
 
 
 class ResidualWithContext(Wrapper):
@@ -240,7 +175,17 @@ class ResidualWithContext(Wrapper):
     """
     _base_local_attrs: ClassVar[set[str]] = (
         Wrapper._base_local_attrs
-        | {"_context_dim", "_config", "norm", "scale", "shift", "layer_scale_gate"}
+        | {
+            "_context_dim",
+            "_config",
+            "norm",
+            "scale",
+            "shift",
+            "layer_scale_gate",
+            "drop_path_rate",
+            "input_format",
+            "dropout_rate",
+        }
     )
 
     def __init__(
@@ -260,6 +205,9 @@ class ResidualWithContext(Wrapper):
         if context_dim <= 0:
             raise ValueError(f"context_dim must be positive: {context_dim}")
         config = config if exists(config) else ResidualConfig()
+        self.drop_path_rate = config.drop_path_rate
+        self.dropout_rate = config.dropout_rate
+        self.input_format = config.input_format
         self._context_dim = context_dim
         self._config = config
         self._setup_layer_scale(config)
@@ -316,6 +264,8 @@ class ResidualWithContext(Wrapper):
                 raise ValueError(
                     f"Unknown init_method: {self._config.layer_scale_init_method}"
                 )
+        if hasattr(self.wrapped_component, "reset_parameters"):
+            self.wrapped_component.reset_parameters()
 
     def __repr__(self) -> str:
         return f"Context-Residual{self.component}"
@@ -334,77 +284,32 @@ class ResidualWithContext(Wrapper):
         shift = append_dimensions(self.shift(context), x.dim(), dim=1)
         gate = append_dimensions(self.layer_scale_gate(context), x.dim(), dim=1)
         tmp = self.norm(x) * (scale + 1) + shift
-        return x + self.wrapped_component(tmp, *args, **kwargs) * gate
 
+        out = self.wrapped_component(tmp, *args, **kwargs) * gate
+        out = maybe_apply_dropout(
+            out,
+            self.dropout_rate,
+            self.training,
+        )
+        if self._config.input_format == "packed":
+            assert "cu_seqlens" in kwargs, (
+                "cu_seqlens must be provided for packed input format."
+            )
+            cu_seqlens = kwargs["cu_seqlens"]
+            out = maybe_apply_stochastic_depth(
+                out,
+                cu_seqlens,
+                self.drop_path_rate,
+                self.training,
+                self.input_format,
+            )
+        else:
+            out = maybe_apply_stochastic_depth(
+                out,
+                None,
+                self.drop_path_rate,
+                self.training,
+                self.input_format,
+            )
 
-def get_drop_sample(
-    keep_prob: float,
-    batch_size: int,
-    device: th.device,
-    dtype: th.dtype,
-):
-    """Generates a mask signifying which samples to drop.
-
-    Args:
-        keep_prob: Probability of an element to be kept.
-        batch_size: Size of the batch.
-        device: device to create the mask on.
-        dtype: dtype of the mask.
-
-    Returns:
-        A tensor of shape (batch_size,) with 1s for kept samples and 0s for dropped
-        samples.
-    """
-    random_tensor = th.rand(batch_size, device=device, dtype=dtype)
-    return (random_tensor < keep_prob).to(dtype)
-
-
-def apply_batched_drop_path(
-    output: GeneralBatchedTensor,
-    drop_prob: float,
-):
-    """Applies DropPath to the output tensor.
-
-    Randomly drops entire samples in the batch with probability `drop_prob`.
-
-    Args:
-        output: Output tensor of shape (batch_size, ...).
-        drop_prob: Probability of an element to be zeroed.
-
-    Returns:
-        Tensor after applying DropPath.
-    """
-    keep_prob = 1 - drop_prob
-    dropped = get_drop_sample(keep_prob, output.shape[0], output.device, output.dtype)
-    dropped = append_dimensions(dropped, output.dim())
-    return output.div(keep_prob) * dropped
-
-
-# This function technically needs the lengths and not the cumulative lengths,
-# but since most other functions / classes use cumulative lengths, we keep it
-# consistent, at the cost of a (probably very minor) inefficiency.
-# If one aims to optimize this for efficiency, one could store the lengths at beginning
-# of forward pass in class, and then refactor this to take lengths directly.
-def apply_packed_drop_path(
-    output: GeneralPackedTensor,
-    cu_seqlens: CulensTensor,
-    drop_prob: float,
-):
-    """Applies DropPath to packed sequences.
-
-    Args:
-        output: Output tensor of shape (total_length, ...).
-        cu_seqlens: Cumulative sequence lengths tensor. Shape (batch_size + 1,).
-        drop_prob: Probability of a sequence to be zeroed.
-
-    Returns:
-        Tensor after applying DropPath.
-    """
-    keep_prob = 1 - drop_prob
-    dropped = get_drop_sample(
-        keep_prob, cu_seqlens.shape[0] - 1, output.device, output.dtype
-    )
-    # repeating according to sequence lengths
-    dropped = th.repeat_interleave(dropped, th.diff(cu_seqlens), dim=0)
-    dropped = append_dimensions(dropped, output.dim())
-    return output.div(keep_prob) * dropped
+        return x + out

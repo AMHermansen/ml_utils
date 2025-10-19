@@ -3,6 +3,7 @@ from typing import Literal
 
 from typing_extensions import override
 
+from ml_utils.components import wrapper
 from ml_utils.components.attention import (
     CrossAttentionConfig,
     PackedCrossAttention,
@@ -11,7 +12,6 @@ from ml_utils.components.attention import (
 )
 from ml_utils.components.base import BaseComponent
 from ml_utils.components.swiglu import SwiGLUMLP
-from ml_utils.components.wrappers import Residual, ResidualConfig
 from ml_utils.torch_utils.types import CulensTensor, PackedTensor
 
 
@@ -36,7 +36,7 @@ class TransformerDecoderBlockConfig:
     cross_attention_config: CrossAttentionConfig = field(
         default_factory=CrossAttentionConfig
     )
-    residual_config: ResidualConfig = field(default_factory=ResidualConfig)
+    residual_config: wrapper.ResidualConfig = field(default_factory=wrapper.ResidualConfig)
 
     do_self_attention_before_cross_attention: bool = True
     swiglu_mode: Literal["swish", "mp", "gelu", "silu"] = "swish"
@@ -71,21 +71,21 @@ class TransformerDecoderBlock(BaseComponent):
         super().__init__()
         self._config = config
 
-        self.self_attention = Residual(
+        self.self_attention = wrapper.Residual(
             PackedSelfAttention(
                 in_features=in_features,
                 config=config.self_attention_config
             ),
             config.residual_config,
         )
-        self.cross_attention = Residual(
+        self.cross_attention = wrapper.Residual(
             PackedCrossAttention(
                 in_features=in_features,
                 config=config.cross_attention_config
             ),
             config.residual_config,
         )
-        self._feed_forward = Residual(
+        self._feed_forward = wrapper.Residual(
             SwiGLUMLP(in_features=in_features, mode=config.swiglu_mode),
             config.residual_config,
         )

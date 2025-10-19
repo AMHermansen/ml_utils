@@ -1,16 +1,10 @@
 from .attention import PackedSelfAttention
-from .base import BaseComponent
 from .embedding import CosineEmbedding, FourierEmbedding
 from .swiglu import SwiGLU, SwiGLUMLP
-from .wrappers import (
-    Residual,
-    ResidualConfig,
-    ResidualWithContext,
-    Wrapper,
-)
+from .wrapper.base import Wrapper
+from .wrapper.residual import Residual, ResidualConfig, ResidualWithContext
 
 __all__ = [
-    "BaseComponent",
     "CosineEmbedding",
     "FourierEmbedding",
     "PackedSelfAttention",
