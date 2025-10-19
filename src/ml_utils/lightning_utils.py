@@ -1,6 +1,7 @@
 """Modules and utilities for PyTorch Lightning integration."""
-
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
 from typing import Any, cast
 
@@ -10,6 +11,8 @@ from lightning.pytorch.cli import SaveConfigCallback
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.utilities.types import OptimizerLRScheduler
 from typing_extensions import override
+
+from ml_utils.torch_utils.optimizers import Muon, suitable_for_muon
 
 
 class WandBSaveConfigCallback(SaveConfigCallback):
@@ -52,6 +55,64 @@ def configure_optimizer_standard(
         filter(lambda p: p.requires_grad, model.parameters()),
         **lightning_config.optimizer_kwargs,
     )
+    config = {
+        "optimizer": optimizer,
+    }
+    if lightning_config.scheduler_class is not None:
+        scheduler = lightning_config.scheduler_class(
+            optimizer, **lightning_config.scheduler_kwargs
+        )
+        config.update(
+            {
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    **lightning_config.scheduler_config,
+                }
+            }
+        )
+    return config
+
+
+def configure_muon_optimizer(
+    muon_parameter_candidates: Iterable[th.nn.Parameter],
+    remaining_parameters: Iterable[th.nn.Parameter],
+    lightning_config: LightningConfig,
+):
+    """Configure optimizer and scheduler for Muon optimizer.
+
+    This function sets up the optimizer and learning rate scheduler
+    specifically for Muon models, using the provided Lightning configuration.
+    """
+    muon_params = filter(
+        lambda p: p.requires_grad and suitable_for_muon(p),
+        muon_parameter_candidates
+    )
+    adam_params1 = filter(
+        lambda p: p.requires_grad and not suitable_for_muon(p),
+        muon_params
+    )
+    adam_params2 = filter(
+        lambda p: p.requires_grad,
+        remaining_parameters
+    )
+
+    muon_group ={
+        "params": muon_params,
+        "lr": lightning_config.optimizer_kwargs.get("muon_lr", 0.05,),
+        "momentum": lightning_config.optimizer_kwargs.get("muon_momentum", 0.95,),
+        "weight_decay": lightning_config.optimizer_kwargs.get("muon_weight_decay", 0.0,),
+        "use_muon": True,
+    }
+
+    adam_group = {
+        "params": chain(adam_params1, adam_params2),
+        "lr": lightning_config.optimizer_kwargs.get("adam_lr", 0.02,),
+        "betas": lightning_config.optimizer_kwargs.get("adam_betas", (0.9, 0.95),),
+        "eps": lightning_config.optimizer_kwargs.get("adam_eps", 1e-10,),
+        "weight_decay": lightning_config.optimizer_kwargs.get("adam_weight_decay", 0.0),
+        "use_muon": False,
+    }
+    optimizer = Muon([muon_group, adam_group])
     config = {
         "optimizer": optimizer,
     }

@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .muon import Muon
+from .muon import Muon, suitable_for_muon
 
 try:
     from lion_pytorch import Lion
@@ -16,4 +16,5 @@ except ImportError:
 __all__ = [
     "Lion",
     "Muon",
+    "suitable_for_muon",
 ]
