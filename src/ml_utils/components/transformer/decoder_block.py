@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Literal
 
 from typing_extensions import override
 
@@ -38,6 +39,7 @@ class TransformerDecoderBlockConfig:
     residual_config: ResidualConfig = field(default_factory=ResidualConfig)
 
     do_self_attention_before_cross_attention: bool = True
+    swiglu_mode: Literal["swish", "mp", "gelu", "silu"] = "swish"
 
 
 class TransformerDecoderBlock(BaseComponent):
@@ -84,7 +86,7 @@ class TransformerDecoderBlock(BaseComponent):
             config.residual_config,
         )
         self._feed_forward = Residual(
-            SwiGLUMLP(in_features=in_features),
+            SwiGLUMLP(in_features=in_features, mode=config.swiglu_mode),
             config.residual_config,
         )
 
