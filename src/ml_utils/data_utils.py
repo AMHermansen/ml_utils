@@ -1,6 +1,7 @@
-from torch.utils.data import default_collate
-import torch as th
 from typing import Any
+
+import torch as th
+from torch.utils.data import default_collate
 
 
 def check_variable_in_list_of_batches(
@@ -33,11 +34,11 @@ class CumulativeSeqlengthCollator:
         seqlen_variable_names: list[str] | str,
         seqlen_keys: list[str] | str = "cu_seqlen",
     ):
-        """Constructor.
+        """Constructor for CumulativeSeqlengthCollator.
 
         Args:
-            seqlen_variable_names:
-            seqlen_key:
+            seqlen_variable_names: List of variable names that are sequences and should be concatenated.
+            seqlen_keys: Key(s) in the batch dictionaries that contains the cumulative sequence lengths.
         """
         self.seqlen_variable_names = (
             seqlen_variable_names
