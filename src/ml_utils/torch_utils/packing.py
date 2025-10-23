@@ -58,7 +58,9 @@ def pack_tensors(
     )
     # We really, really do not want cu_seqlens to not be increasing.
     # Leads to very hard to debug errors in flash attention.
-    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
+    assert is_increasing_sequence(cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
     return cu_seqlens, tuple(packed_tensors)
 
 
@@ -85,7 +87,9 @@ def unpack_tensors(
     """
     # We really, really do not want cu_seqlens to not be increasing.
     # Leads to very hard to debug errors in flash attention.
-    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
+    assert is_increasing_sequence(cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
     if max_length is None:
         max_length = th.diff(cu_seqlens).max().item()
     batch_size = len(cu_seqlens) - 1
@@ -120,8 +124,10 @@ def prepend_tokens_to_packed_tensor(
     Returns:
         tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative sequence lengths.
     """
-    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
-    mask, (unpacked_tensors, ) = unpack_tensors(cu_seqlens, packed_tensor)
+    assert is_increasing_sequence(cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
+    mask, (unpacked_tensors,) = unpack_tensors(cu_seqlens, packed_tensor)
     batch_size = len(cu_seqlens) - 1
     unpacked_shape = unpacked_tensors.shape
     tokens_expanded = tokens.unsqueeze(0).repeat(
@@ -129,11 +135,16 @@ def prepend_tokens_to_packed_tensor(
     )
     new_unpacked = th.cat([tokens_expanded, unpacked_tensors], dim=1)
     mask_new = th.cat(
-        [th.ones((batch_size, tokens.shape[0]), dtype=th.bool, device=mask.device), mask],
+        [
+            th.ones((batch_size, tokens.shape[0]), dtype=th.bool, device=mask.device),
+            mask,
+        ],
         dim=1,
     )
-    new_cu_seqlens, (new_packed_tensor, ) = pack_tensors(mask_new, new_unpacked)
-    assert is_increasing_sequence(new_cu_seqlens), "cu_seqlens must be an increasing sequence"
+    new_cu_seqlens, (new_packed_tensor,) = pack_tensors(mask_new, new_unpacked)
+    assert is_increasing_sequence(new_cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
     return new_packed_tensor, new_cu_seqlens
 
 
@@ -152,8 +163,10 @@ def remove_tokens_from_packed_tensor(
     Returns:
         tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative sequence lengths
     """
-    assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
-    mask, (unpacked_tensors, ) = unpack_tensors(cu_seqlens, packed_tensor)
+    assert is_increasing_sequence(cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
+    mask, (unpacked_tensors,) = unpack_tensors(cu_seqlens, packed_tensor)
     unpacked_shape = unpacked_tensors.shape
     if n_tokens >= unpacked_shape[1]:
         raise ValueError(
@@ -162,6 +175,8 @@ def remove_tokens_from_packed_tensor(
         )
     new_unpacked = unpacked_tensors[:, n_tokens:, ...]
     mask_new = mask[:, n_tokens:]
-    new_cu_seqlens, (new_packed_tensor, ) = pack_tensors(mask_new, new_unpacked)
-    assert is_increasing_sequence(new_cu_seqlens), "cu_seqlens must be an increasing sequence"
+    new_cu_seqlens, (new_packed_tensor,) = pack_tensors(mask_new, new_unpacked)
+    assert is_increasing_sequence(new_cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
     return new_packed_tensor, new_cu_seqlens
