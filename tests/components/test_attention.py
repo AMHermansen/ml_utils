@@ -1,7 +1,7 @@
 import pytest
 import torch as th
 import torch.cuda
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from ml_utils.components import PackedSelfAttention
@@ -75,7 +75,7 @@ def test_attention_functions_swappable(nheads_dim, culens_pack):
 
     attn = PackedSelfAttention(
         in_features=nheads * head_dim,
-        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True)
+        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True),
     ).to(DEVICE)
 
     x = th.randn((packed_len, nheads * head_dim), dtype=th.float32, device=DEVICE)
@@ -99,7 +99,6 @@ def test_attention_functions_swappable(nheads_dim, culens_pack):
     culens_pack=culens_and_packed_len(),
     dropout_p=st.floats(min_value=0.0, max_value=0.5),
 )
-@settings(deadline=10_000)
 def test_training_vs_eval_flash_attention_kwargs_selected(
     nheads_dim, culens_pack, dropout_p
 ):
@@ -107,6 +106,8 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
     and when in eval() it passes the eval kwargs (dropout_p == 0.0).
     We inject an attention function that records 'flash_attn_kwargs' passed to it.
     """
+    if not torch.cuda.is_available():
+        pytest.skip("Flash attention not available on CPU.")
     nheads, dimension, _ = nheads_dim
     culens, _ = culens_pack
     packed_len = int(culens[-1].item())
@@ -115,7 +116,7 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
 
     attn = PackedSelfAttention(
         in_features=dimension,
-        config=SelfAttentionConfig(nheads=nheads, flash_attention_kwargs=train_kwargs)
+        config=SelfAttentionConfig(nheads=nheads, flash_attention_kwargs=train_kwargs),
     ).to(DEVICE)
 
     # record the flash_attn_kwargs passed to the attention function.
@@ -160,7 +161,7 @@ def test_use_flash_attention_setter_toggles(nheads_dim):
     nheads, dimension, _ = nheads_dim
     attn = PackedSelfAttention(
         in_features=dimension,
-        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True)
+        config=SelfAttentionConfig(nheads=nheads, use_flash_attention=True),
     ).to(DEVICE)
 
     # initial state True
