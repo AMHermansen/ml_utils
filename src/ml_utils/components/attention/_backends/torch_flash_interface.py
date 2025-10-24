@@ -20,7 +20,9 @@ from ._utils import (
 
 
 # Currently bug in pytorch see https://github.com/pytorch/pytorch/issues/149608
-def torch_flash_attention_interface(
+# This should be faster slightly faster than the workaround version,
+# but still slower than true packed flash attention.
+def torch_flash_attention_interface_bug(
     qkv: AllPackedQKVTypes,
     *,
     cu_seqlens_q: CulensTensor,
@@ -73,8 +75,8 @@ def torch_flash_attention_interface(
         else:
             raise ValueError("qkv must be a tuple of (q, k, v) or (q, kv)")
     else:
-        qkv = th.chunk(qkv, 3, dim=1)
-        q, k, v = qkv
+        qkv = th.chunk(qkv, 3, dim=1)  # type: ignore
+        q, k, v = qkv  # type: ignore
     q = q.squeeze(1)
     k = k.squeeze(1)
     v = v.squeeze(1)
@@ -151,8 +153,8 @@ def torch_flash_attention_interface(
         else:
             raise ValueError("qkv must be a tuple of (q, k, v) or (q, kv)")
     else:
-        qkv = th.chunk(qkv, 3, dim=1)
-        q, k, v = qkv
+        qkv = th.chunk(qkv, 3, dim=1)  # type: ignore
+        q, k, v = qkv  # type: ignore
     q = q.squeeze(1)
     k = k.squeeze(1)
     v = v.squeeze(1)
@@ -162,24 +164,22 @@ def torch_flash_attention_interface(
 
     attention_mask = combine_query_and_key_mask(q_mask, kv_mask)
 
-    unpacked_out = th.stack(
-        [
-            scaled_dot_product_attention(
-                query,
-                key,
-                value,
-                attn_mask=attn_mask,
-                dropout_p=flash_attn_kwargs.dropout_p,
-                is_causal=flash_attn_kwargs.causal,
-                scale=flash_attn_kwargs.softmax_scale,
-            )
-            for query, key, value, attn_mask in zip(
-                swap_length_and_head_dim(q_unpacked),
-                swap_length_and_head_dim(k_unpacked),
-                swap_length_and_head_dim(v_unpacked),
-                attention_mask,
-            )
-        ]
-    )
+    unpacked_out = th.stack([
+        scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            attn_mask=attn_mask,
+            dropout_p=flash_attn_kwargs.dropout_p,
+            is_causal=flash_attn_kwargs.causal,
+            scale=flash_attn_kwargs.softmax_scale,
+        )
+        for query, key, value, attn_mask in zip(
+            swap_length_and_head_dim(q_unpacked),
+            swap_length_and_head_dim(k_unpacked),
+            swap_length_and_head_dim(v_unpacked),
+            attention_mask,
+        )
+    ])
     _, (packed_out,) = pack_tensors(kv_mask, swap_length_and_head_dim(unpacked_out))
     return packed_out

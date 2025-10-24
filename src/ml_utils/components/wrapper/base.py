@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, ClassVar
+from typing import Any, cast, ClassVar
 
 import jaxtyping as jt
 import torch as th
@@ -52,14 +52,14 @@ class Wrapper(BaseComponent):
         check_feature_preserving(wrapped_component)
         self.wrapped_component = wrapped_component
 
-    @override
     @property
+    @override
     def in_features(self) -> int:
         """Input dimension of this module."""
-        return self.wrapped_component.in_features
+        return cast("int", self.wrapped_component.in_features)
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         """Input dimension of this module."""
         return self.wrapped_component.out_features

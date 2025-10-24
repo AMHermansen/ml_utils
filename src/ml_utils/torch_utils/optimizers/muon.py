@@ -18,6 +18,8 @@ https://github.com/KellerJordan/Muon
 This file also includes code based on:
 https://github.com/mattcleigh/mltools
 """
+from typing import Callable
+from typing_extensions import override
 
 import torch as th
 from torch import nn
@@ -26,6 +28,7 @@ from ml_utils.torch_utils.misc import ParameterNoWeightDecay
 
 
 # Function adapted from: https://github.com/KellerJordan/Muon
+@th.compile
 def zeropower_via_newtonschulz5(G, steps: int):
     """Newton-Schulz iteration to compute the zeroth power / orthogonalization of G.
     We opt to use a quintic iteration whose coefficients are selected to maximize the
@@ -69,6 +72,7 @@ def muon_update(grad, momentum, beta=0.95, ns_steps=5, nesterov=True):
     update = zeropower_via_newtonschulz5(update, steps=ns_steps)
     update *= max(1, grad.size(-2) / grad.size(-1)) ** 0.5
     return update
+
 
 # Function adapted from: https://github.com/KellerJordan/Muon
 def adam_update(grad, buf1, buf2, step, betas, eps):
@@ -137,8 +141,8 @@ class SingleDeviceMuonWithAuxAdam(th.optim.Optimizer):
         super().__init__(param_groups, {})
 
     @th.no_grad()
-    def step(self, closure=None):
-
+    @override
+    def step(self, closure: Callable[[], float] | None = None) -> float | None:
         loss = None
         if closure is not None:
             with th.enable_grad():

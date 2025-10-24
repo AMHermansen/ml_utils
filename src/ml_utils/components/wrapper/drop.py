@@ -125,7 +125,11 @@ def maybe_apply_stochastic_depth(
         Tensor after applying stochastic depth.
     """
     if drop_path_rate > 0.0 and training:
-        if input_format == "packed":
+        if input_format == "packed" and cu_seqlens is not None:
             return apply_packed_drop_path(x, cu_seqlens, drop_path_rate)
+        if input_format == "packed" and cu_seqlens is None:
+            raise ValueError(
+                "cu_seqlens must be provided for packed input format."
+            )
         return apply_batched_drop_path(x, drop_path_rate)
     return x

@@ -151,19 +151,20 @@ class TransformerDecoderBlock(BaseComponent):
             != self.cross_attention.use_flash_attention
         ):
             return None
-        return self.attention.use_flash_attention
+        assert isinstance(self.self_attention.use_flash_attention, bool)
+        return self.self_attention.use_flash_attention
 
     @use_flash_attention.setter
     def use_flash_attention(self, value: bool):
         self.self_attention.use_flash_attention = value
         self.cross_attention.use_flash_attention = value
 
-    @override
     @property
+    @override
     def in_features(self) -> int:
-        return self.attention.in_features
+        return self.self_attention.in_features
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
-        return self.attention.out_features
+        return self.self_attention.out_features

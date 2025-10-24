@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import cast
 
 import torch as th
 from torch import nn
@@ -37,7 +38,9 @@ class TransformerEncoderConfig:
     num_layers: int = 6
     num_registers: int = 0
     num_class_tokens: int = 0
-    transformer_config: TransformerEncoderBlockConfig = field(default_factory=TransformerEncoderBlockConfig)
+    transformer_config: TransformerEncoderBlockConfig = field(
+        default_factory=TransformerEncoderBlockConfig
+    )
 
 
 class TransformerEncoder(BaseComponent):
@@ -48,11 +51,8 @@ class TransformerEncoder(BaseComponent):
         config: Configuration for the Transformer Encoder. See
             `TransformerEncoderConfig`, for details.
     """
-    def __init__(
-        self,
-        in_features: int,
-        config: TransformerEncoderConfig
-    ):
+
+    def __init__(self, in_features: int, config: TransformerEncoderConfig):
         """Transformer Encoder consisting of multiple TransformerEncoderBlocks.
 
         Args:
@@ -69,28 +69,27 @@ class TransformerEncoder(BaseComponent):
         self._num_class_tokens = config.num_class_tokens
         self._transformer_config = config.transformer_config
 
-        self._layers = nn.ModuleList(
-            [
-                TransformerEncoderBlock(
-                    in_features=self._in_features,
-                    config=self._transformer_config,
-                )
-                for _ in range(self._num_layers)
-            ]
+        self._layers = nn.ModuleList([
+            TransformerEncoderBlock(
+                in_features=self._in_features,
+                config=self._transformer_config,
+            )
+            for _ in range(self._num_layers)
+        ])
+
+        self._registers = (
+            ParameterNoWeightDecay(th.randn(self._num_registers, self._in_features))
+            if self._num_registers > 0
+            else None
+        )
+        self._class_tokens = (
+            ParameterNoWeightDecay(th.randn(self._num_class_tokens, self._in_features))
+            if self._num_class_tokens > 0
+            else None
         )
 
-        self._registers = ParameterNoWeightDecay(
-            th.randn(self._num_registers, self._in_features)
-        ) if self._num_registers > 0 else None
-        self._class_tokens = ParameterNoWeightDecay(
-            th.randn(self._num_class_tokens, self._in_features)
-        ) if self._num_class_tokens > 0 else None
-
     def forward(
-        self,
-        x: PackedTensor,
-        cu_seqlens: CulensTensor,
-        max_seqlen: int | None = None
+        self, x: PackedTensor, cu_seqlens: CulensTensor, max_seqlen: int | None = None
     ) -> tuple[PackedTensor, CulensTensor, int | None]:
         """Forward pass through the Transformer Encoder.
 
@@ -118,16 +117,12 @@ class TransformerEncoder(BaseComponent):
             max_seqlen,
         )
         if not exists(max_seqlen):
-            max_seqlen = th.diff(cu_seqlens).max().item()
+            max_seqlen = cast("int", th.diff(cu_seqlens).max().item())
 
         for layer in self._layers:
             x = layer(x, cu_seqlens, max_seqlen)
 
-        return self.maybe_remove_registers(
-            x,
-            cu_seqlens,
-            max_seqlen
-        )
+        return self.maybe_remove_registers(x, cu_seqlens, max_seqlen)
 
     def maybe_add_class_tokens(
         self,
@@ -150,6 +145,7 @@ class TransformerEncoder(BaseComponent):
                 - Updated maximum sequence length.
         """
         if self.has_cls_tokens:
+            assert self._class_tokens is not None, "Class tokens parameter is None."
             x, cu_seqlens = prepend_tokens_to_packed_tensor(
                 x,
                 cu_seqlens,
@@ -178,6 +174,9 @@ class TransformerEncoder(BaseComponent):
                 - Updated maximum sequence length.
         """
         if self.has_registers:
+            assert self._registers is not None, (
+                "Registers should not be None when has_registers is True."
+            )
             x, cu_seqlens = prepend_tokens_to_packed_tensor(
                 x,
                 cu_seqlens,
@@ -228,7 +227,8 @@ class TransformerEncoder(BaseComponent):
     def use_flash_attention(self, value: bool):
         """Set whether to use flash attention in all encoder blocks."""
         for layer in self._layers:
-            layer.use_flash_attention = value
+            if hasattr(layer, "use_flash_attention"):
+                layer.use_flash_attention = value  # type: ignore
 
     @property
     def has_registers(self) -> bool:
@@ -240,14 +240,14 @@ class TransformerEncoder(BaseComponent):
         """Whether the encoder has class tokens."""
         return self._num_class_tokens > 0
 
-    @override
     @property
-    def in_features(self) -> int | None:
+    @override
+    def in_features(self) -> int:
         """Input feature dimension."""
         return self._in_features
 
-    @override
     @property
-    def out_features(self) -> int | None:
+    @override
+    def out_features(self) -> int:
         """Output feature dimension."""
         return self._in_features

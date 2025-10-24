@@ -40,6 +40,7 @@ class PackedCrossAttention(BaseComponent):
             config: Configuration for the cross-attention module.
         """
         config = config if exists(config) else CrossAttentionConfig()
+        assert isinstance(config, CrossAttentionConfig)
         super().__init__()
         if in_features % config.nheads != 0:
             raise ValueError("dimension must be divisible by nheads")
@@ -49,7 +50,9 @@ class PackedCrossAttention(BaseComponent):
         self._dimension = in_features
         self._head_dim = in_features // config.nheads
         self._q_in_dim = in_features
-        self._kv_in_dim = config.kv_in_dim if exists(config.kv_in_dim) else in_features
+        kv_in_dim = config.kv_in_dim if exists(config.kv_in_dim) else in_features
+        assert isinstance(kv_in_dim, int)
+        self._kv_in_dim = kv_in_dim
         self._q_bias = config.q_bias
         self._kv_bias = config.kv_bias
         self._include_qk_norm = exists(config.qk_norm_type)
@@ -165,6 +168,7 @@ class PackedCrossAttention(BaseComponent):
         # If no QKNorm, we can keep KV merged for efficiency.
         q_headed = self._convert_to_headed_layout(q_embedded)
         if self._include_qk_norm:
+            assert self._qk_norm is not None
             k_embedded, v_embedded = kv_embedded.chunk(2, dim=-1)
             k_headed = self._convert_to_headed_layout(k_embedded)
             v_headed = self._convert_to_headed_layout(v_embedded)
@@ -188,8 +192,8 @@ class PackedCrossAttention(BaseComponent):
             else torch_flash_attention_interface
         )
 
-    @override
     @property
+    @override
     def in_features(self) -> int:
         return self._q_in_dim
 
@@ -198,7 +202,7 @@ class PackedCrossAttention(BaseComponent):
         """Input feature dimension for conditioning sequence."""
         return self._kv_in_dim
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         return self._dimension

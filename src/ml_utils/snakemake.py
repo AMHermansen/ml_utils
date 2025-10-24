@@ -48,4 +48,4 @@ class SnakemakeConfirmFinish(Callback):
 
 
 def add_snakemake_config_callback_command(output_file: str | Path, msg: str | None = None) -> str:
-    return f"--trainer.callbacks+={inspect.getfile(SnakemakeConfirmFinish.__class__)}"
+    return f"--trainer.callbacks+={SnakemakeConfirmFinish.__module__}.{SnakemakeConfirmFinish.__name__}"

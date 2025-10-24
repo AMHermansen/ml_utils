@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from typing import cast
 
 import torch as th
 from flash_attn.flash_attn_interface import (
@@ -41,12 +42,12 @@ def detect_qkv_structure(
     """
     if isinstance(qkv, tuple) and len(qkv) == 3:
         # We have 3 separate tensors, one for q, k, and v.
-        return flash_attn_varlen_func, True
+        return flash_attn_varlen_func, True  # type: ignore
     if isinstance(qkv, tuple) and len(qkv) == 2:
         # Only two separate tensors (i.e. cross attention with kv merged)
-        return flash_attn_varlen_kvpacked_func, True
+        return flash_attn_varlen_kvpacked_func, True  # type: ignore
     if isinstance(qkv, th.Tensor):
-        return flash_attn_varlen_qkvpacked_func, False
+        return flash_attn_varlen_qkvpacked_func, False  # type: ignore
     raise ValueError(f"detect_qkv_structure received unexpected input: {type(qkv)}")
 
 
@@ -92,7 +93,10 @@ def transform_qkv_to_bfloat16(
 
     """
     if isinstance(qkv, tuple):
-        return tuple(t.to(th.bfloat16) for t in qkv)
+        return cast(
+            "tuple[PackedMHATensor, PackedMHATensor, PackedMHATensor]", 
+            tuple(t.to(th.bfloat16) for t in qkv)
+        )
     if isinstance(qkv, th.Tensor):
         return qkv.to(th.bfloat16)
     raise ValueError(

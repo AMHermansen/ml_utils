@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import cast
 
 import torch as th
 from torch import nn
@@ -25,9 +26,12 @@ class TransformerDecoderConfig:
         num_registers: Number of register tokens to prepend to the input.
         transformer_config: Configuration for each TransformerDecoderBlock.
     """
+
     num_layers: int = 6
     num_registers: int = 0
-    transformer_config: TransformerDecoderBlockConfig = field(default_factory=TransformerDecoderBlockConfig)
+    transformer_config: TransformerDecoderBlockConfig = field(
+        default_factory=TransformerDecoderBlockConfig
+    )
 
 
 class TransformerDecoder(BaseComponent):
@@ -41,6 +45,7 @@ class TransformerDecoder(BaseComponent):
         in_features: Input feature dimension.
         config: Configuration for the Transformer Decoder.
     """
+
     def __init__(
         self,
         in_features: int,
@@ -60,20 +65,18 @@ class TransformerDecoder(BaseComponent):
         self._num_registers = config.num_registers
         self._transformer_config = config.transformer_config
 
-        self.layers = nn.ModuleList(
-            [
-                TransformerDecoderBlock(
-                    in_features=in_features,
-                    config=config.transformer_config,
-                )
-                for _ in range(config.num_layers)
-            ]
-        )
+        self._layers = nn.ModuleList([
+            TransformerDecoderBlock(
+                in_features=in_features,
+                config=config.transformer_config,
+            )
+            for _ in range(config.num_layers)
+        ])
 
         self._registers = (
-            ParameterNoWeightDecay(
-                th.randn(self._num_registers, self._in_features)
-            ) if self._num_registers > 0 else None
+            ParameterNoWeightDecay(th.randn(self._num_registers, self._in_features))
+            if self._num_registers > 0
+            else None
         )
 
     def forward(
@@ -86,6 +89,7 @@ class TransformerDecoder(BaseComponent):
         max_seqlen_kv: int | None = None,
     ) -> PackedTensor:
         """Forward pass through the Transformer block.
+
 
         Args:
             q_sequence: The primary input sequence tensor of shape (total_tokens, in_features).
@@ -105,11 +109,13 @@ class TransformerDecoder(BaseComponent):
             max_seqlen_q,
         )
         if not exists(max_seqlen_q):
-            max_seqlen_q = th.diff(cu_seqlens_q).max().item()
+            max_seqlen_q = cast("int", th.diff(cu_seqlens_q).max().item())
+            assert isinstance(max_seqlen_q, int)
         if not exists(max_seqlen_kv):
-            max_seqlen_kv = th.diff(cu_seqlens_kv).max().item()
+            max_seqlen_kv = cast("int", th.diff(cu_seqlens_kv).max().item())
+            assert isinstance(max_seqlen_kv, int)
 
-        for layer in self.layers:
+        for layer in self._layers:
             q_sequence = layer(
                 q_sequence=q_sequence,
                 kv_sequence=kv_sequence,
@@ -141,6 +147,7 @@ class TransformerDecoder(BaseComponent):
                 - Updated maximum sequence length.
         """
         if self.has_registers:
+            assert self._registers is not None
             x, cu_seqlens = prepend_tokens_to_packed_tensor(
                 x,
                 cu_seqlens,
@@ -180,8 +187,7 @@ class TransformerDecoder(BaseComponent):
     def use_flash_attention(self) -> bool:
         """Whether any of the encoder blocks use flash attention."""
         assert all(
-            layer.use_flash_attention
-            == self._layers[0].use_flash_attention  # type: ignore
+            layer.use_flash_attention == self._layers[0].use_flash_attention  # type: ignore
             for layer in self._layers
         )
         # Type checker only assumes that self._layers is a ModuleList[Module].
@@ -192,21 +198,22 @@ class TransformerDecoder(BaseComponent):
     def use_flash_attention(self, value: bool):
         """Set whether to use flash attention in all encoder blocks."""
         for layer in self._layers:
-            layer.use_flash_attention = value
+            if hasattr(layer, "use_flash_attention"):
+                layer.use_flash_attention = value  # type: ignore
 
     @property
     def has_registers(self) -> bool:
         """Whether the encoder has register tokens."""
         return self._num_registers > 0
 
-    @override
     @property
+    @override
     def in_features(self) -> int | None:
         """Input feature dimension."""
         return self._in_features
 
-    @override
     @property
-    def out_features(self) -> int | None:
+    @override
+    def out_features(self) -> int:
         """Output feature dimension."""
         return self._in_features

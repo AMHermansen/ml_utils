@@ -28,7 +28,7 @@ def batch_list_strategy(draw):
 def test_cumulative_seqlength_collator_hypothesis(batches):
     collator = CumulativeSeqlengthCollator(
         seqlen_variable_names=[key for key in batches[0] if key.startswith("features")],
-        seqlen_keys=[key for key in batches[0] if key.startswith("cu_seqlen")],
+        cu_seqlen_names=[key for key in batches[0] if key.startswith("cu_seqlen")],
     )
     result = collator(batches)
 

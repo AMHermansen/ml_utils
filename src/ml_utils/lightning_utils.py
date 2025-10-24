@@ -13,10 +13,12 @@ from lightning.pytorch.loggers import WandbLogger
 from typing_extensions import override
 
 from ml_utils.torch_utils.optimizers import Muon, suitable_for_muon
+from ml_utils.utils import exists
 
 if TYPE_CHECKING:
     from lightning.pytorch.utilities.types import (
         OptimizerLRScheduler,
+        OptimizerLRSchedulerConfig,
     )
 
 
@@ -27,6 +29,7 @@ class WandBSaveConfigCallback(SaveConfigCallback):
     ) -> None:
         if isinstance(trainer.logger, WandbLogger):
             logger = cast("WandbLogger", trainer.logger)
+            assert trainer.log_dir is not None, "Trainer log_dir is None."
             experiment = logger.experiment
             experiment.log_artifact(
                 artifact_or_path=Path(trainer.log_dir, self.config_filename),
@@ -47,10 +50,10 @@ class LightningConfig:
     """
 
     optimizer_class: type[th.optim.Optimizer] = field(default=th.optim.AdamW)
-    optimizer_kwargs: dict[str, Any] = None
-    scheduler_class: type[th.optim.lr_scheduler.LRScheduler] = None
-    scheduler_kwargs: dict[str, Any] = None
-    scheduler_config: dict[str, Any] = None
+    optimizer_kwargs: dict[str, Any] = field(default_factory=dict)
+    scheduler_class: type[th.optim.lr_scheduler.LRScheduler] | None = None
+    scheduler_kwargs: dict[str, Any] = field(default_factory=dict)
+    scheduler_config: dict[str, Any] = field(default_factory=dict)
 
 
 def configure_optimizer_standard(
@@ -63,6 +66,11 @@ def configure_optimizer_standard(
     config = {
         "optimizer": optimizer,
     }
+    scheduler_config = (
+        lightning_config.scheduler_config
+        if exists(lightning_config.scheduler_config)
+        else {}
+    )
     if lightning_config.scheduler_class is not None:
         scheduler = lightning_config.scheduler_class(
             optimizer, **lightning_config.scheduler_kwargs
@@ -73,7 +81,7 @@ def configure_optimizer_standard(
                 **lightning_config.scheduler_config,
             }
         })
-    return config
+    return cast("OptimizerLRSchedulerConfig", config)
 
 
 def configure_muon_optimizer(
@@ -134,7 +142,8 @@ def configure_muon_optimizer(
     }
     if lightning_config.scheduler_class is not None:
         scheduler = lightning_config.scheduler_class(
-            optimizer, **lightning_config.scheduler_kwargs
+            optimizer,
+            **lightning_config.scheduler_kwargs
         )
         config.update({
             "lr_scheduler": {

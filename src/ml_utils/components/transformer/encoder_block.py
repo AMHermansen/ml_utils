@@ -97,12 +97,12 @@ class TransformerEncoderBlock(BaseComponent):
     def use_flash_attention(self, value: bool):
         self.attention.use_flash_attention = value
 
-    @override
     @property
+    @override
     def in_features(self) -> int:
         return self.attention.in_features
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         return self.attention.out_features

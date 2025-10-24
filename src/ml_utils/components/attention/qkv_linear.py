@@ -70,7 +70,11 @@ class QKVLinear(nn.Module):
         | jt.Float[th.Tensor, "*batch 3*in_features"]
     ):
         if self._split_qkv:
+            assert isinstance(self._q_linear, nn.Linear)
+            assert isinstance(self._k_linear, nn.Linear)
+            assert isinstance(self._v_linear, nn.Linear)
             return self._q_linear(x), self._k_linear(x), self._v_linear(x)
+        assert isinstance(self._qkv_linear, nn.Linear)
         return self._qkv_linear(x)
 
     @property
@@ -110,17 +114,26 @@ class QKVLinear(nn.Module):
             device = w.device
             dtype = w.dtype
 
-            q_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(device=device, dtype=dtype)
-            k_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(device=device, dtype=dtype)
-            v_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(device=device, dtype=dtype)
+            q_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(
+                device=device, dtype=dtype
+            )
+            k_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(
+                device=device, dtype=dtype
+            )
+            v_proj = nn.Linear(in_features, out_each, bias=exists(b)).to(
+                device=device, dtype=dtype
+            )
 
             q_proj.weight.data.copy_(w_q)
             k_proj.weight.data.copy_(w_k)
             v_proj.weight.data.copy_(w_v)
             if b is not None:
-                q_proj.bias.data.copy_(b_q)
-                k_proj.bias.data.copy_(b_k)
-                v_proj.bias.data.copy_(b_v)
+                assert b_q is not None
+                assert b_k is not None
+                assert b_v is not None
+                q_proj.bias.data.copy_(b_q)  # type: ignore
+                k_proj.bias.data.copy_(b_k)  # type: ignore
+                v_proj.bias.data.copy_(b_v)  # type: ignore
 
             self._q_linear = q_proj
             self._k_linear = k_proj
@@ -168,9 +181,7 @@ class QKVLinear(nn.Module):
 
         self._split_qkv = split
 
-    def init_weights(
-        self, init_std: float | None = None
-    ) -> None:
+    def init_weights(self, init_std: float | None = None) -> None:
         """Initialize the weights of the linear layers.
 
         Args:
@@ -178,26 +189,31 @@ class QKVLinear(nn.Module):
                 If None, uses default PyTorch initialization.
         """
         if init_std is None:
-            init_std = self._in_features ** -0.5
+            init_std = self._in_features**-0.5
 
         def _init_linear(layer: nn.Linear) -> None:
+            assert isinstance(init_std, float)
             nn.init.normal_(layer.weight, std=init_std)
             if layer.bias is not None:
                 nn.init.zeros_(layer.bias)
 
         if self._split_qkv:
+            assert isinstance(self._q_linear, nn.Linear)
+            assert isinstance(self._k_linear, nn.Linear)
+            assert isinstance(self._v_linear, nn.Linear)
             _init_linear(self._q_linear)
             _init_linear(self._k_linear)
             _init_linear(self._v_linear)
         else:
+            assert isinstance(self._qkv_linear, nn.Linear)
             _init_linear(self._qkv_linear)
 
     @override
-    def load_state_dict(
+    def load_state_dict(  # type: ignore
         self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False
     ):
         try:
-            super().load_state_dict(state_dict, strict=strict, assign=assign)
+            out = super().load_state_dict(state_dict, strict=strict, assign=assign)
         except RuntimeError as e:
             msg = str(e)
             if "weight" in msg or "bias" in msg:
@@ -209,7 +225,9 @@ class QKVLinear(nn.Module):
                 )
                 self.set_split_qkv(not self._split_qkv)
                 try:
-                    super().load_state_dict(state_dict, strict=strict, assign=assign)
+                    out = super().load_state_dict(
+                        state_dict, strict=strict, assign=assign
+                    )
                 except RuntimeError as e2:
                     logger.exception(
                         "Failed to load state_dict after switching split_qkv. "
@@ -217,3 +235,7 @@ class QKVLinear(nn.Module):
                         stacklevel=1,
                     )
                     raise e2 from e
+                else:
+                    return out
+        else:
+            return out

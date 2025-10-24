@@ -8,7 +8,7 @@ from ._utils import FlashAttentionKWArgs
 from .torch_flash_interface import torch_flash_attention_interface
 
 try:
-    from flash_attention import common_flash_attention_interface
+    from .flash_attention import common_flash_attention_interface
 except ImportError:
     import logging
     logger = logging.getLogger(__name__)

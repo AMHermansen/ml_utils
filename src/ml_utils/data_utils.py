@@ -5,7 +5,7 @@ from torch.utils.data import default_collate
 
 
 def check_variable_in_list_of_batches(
-    variable_name: str, batches: list[dict[str, any]]
+    variable_name: str, batches: list[dict[str, Any]]
 ) -> bool:
     return all(variable_name in batch for batch in batches)
 
@@ -32,13 +32,13 @@ class CumulativeSeqlengthCollator:
     def __init__(
         self,
         seqlen_variable_names: list[str] | str,
-        seqlen_keys: list[str] | str = "cu_seqlen",
+        cu_seqlen_names: list[str] | str = "cu_seqlen",
     ):
         """Constructor for CumulativeSeqlengthCollator.
 
         Args:
             seqlen_variable_names: List of variable names that are sequences and should be concatenated.
-            seqlen_keys: Key(s) in the batch dictionaries that contains the cumulative sequence lengths.
+            cu_seqlen_names: Key(s) in the batch dictionaries that contains the cumulative sequence lengths.
         """
         self.seqlen_variable_names = (
             seqlen_variable_names
@@ -46,7 +46,7 @@ class CumulativeSeqlengthCollator:
             else [seqlen_variable_names]
         )
         self.seqlen_key = (
-            seqlen_keys if isinstance(seqlen_keys, list) else [seqlen_keys]
+            cu_seqlen_names if isinstance(cu_seqlen_names, list) else [cu_seqlen_names]
         )
 
     @property
@@ -75,7 +75,10 @@ class CumulativeSeqlengthCollator:
                 for seqlen_key in self.seqlen_key
             }
 
-        seq_len_vars = {var_name: th.cat([batch[var_name] for batch in batches], dim=0)}
+        seq_len_vars = {
+            var_name: th.cat([batch[var_name] for batch in batches], dim=0)
+            for var_name in self.seqlen_variable_names
+        }
         non_seq_len_vars = default_collate(
             [
                 {k: v for k, v in batch.items() if k not in self.names_used_for_seq_len}

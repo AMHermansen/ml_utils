@@ -1,5 +1,7 @@
 """Module for converting between packed and batched representations of data."""
 
+from typing import cast
+
 import jaxtyping as jt
 import torch as th
 
@@ -52,7 +54,11 @@ def pack_tensors(
         packed_tensors.append(packed_tensor)
     cu_seqlens = th.cumsum(
         th.cat(
-            [th.zeros(1, device=mask.device, dtype=th.int32), mask.sum(dim=1)], dim=0
+            [
+                th.zeros(1, device=mask.device, dtype=th.int32),
+                mask.sum(dim=1),
+            ],
+            dim=0,
         ),
         dim=0,
     )
@@ -91,7 +97,9 @@ def unpack_tensors(
         "cu_seqlens must be an increasing sequence"
     )
     if max_length is None:
-        max_length = th.diff(cu_seqlens).max().item()
+        # Pyright gets confused about Number and int here.
+        max_length = cast("int", th.diff(cu_seqlens).max().item())
+        assert isinstance(max_length, int)
     batch_size = len(cu_seqlens) - 1
     mask = th.arange(max_length, device=cu_seqlens.device).unsqueeze(0) < th.diff(
         cu_seqlens
@@ -112,7 +120,7 @@ def unpack_tensors(
 def prepend_tokens_to_packed_tensor(
     packed_tensor: jt.Float[th.Tensor, " total_len *feature_dims"],
     cu_seqlens: CulensTensor,
-    tokens: jt.Float[th.Tensor, " n_tokens *feature_dims"],
+    tokens: jt.Float[th.Tensor, " n_tokens *feature_dims"] | th.nn.Parameter,
 ) -> tuple[GeneralPackedTensor, CulensTensor]:
     """Prepends tokens to a packed sequence.
 

@@ -24,13 +24,13 @@ class FourierEmbedding(BaseComponent):
         self.register_buffer("freqs", 2 * math.pi * th.randn(num_frequencies))
         self.register_buffer("phases", 2 * math.pi * th.rand(num_frequencies))
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         return self.num_frequencies
 
-    @override
     @property
+    @override
     def in_features(self) -> int | None:
         return None
 
@@ -44,7 +44,7 @@ class FourierEmbedding(BaseComponent):
         Returns:
             (..., N) tensor of Fourier features
         """
-        return (th.einsum("..., ... d -> ... d", x, self.freqs) + self.phases).cos().to(
+        return (th.einsum("..., ... d -> ... d", x, self.freqs) + self.phases).cos().to(  # type: ignore
             x.dtype
         ) + math.sqrt(2)
 
@@ -77,7 +77,7 @@ class CosineEmbedding(BaseComponent):
         super().__init__()
         self.register_buffer("min_value", th.tensor(min_value))
         self.register_buffer("max_value", th.tensor(max_value))
-        self.register_buffer("range", self.max_value - self.min_value)
+        self.register_buffer("range", self.max_value - self.min_value)  # type: ignore
 
         if do_sin and out_dim % 2 != 0:
             raise ValueError("out_dim must be even when do_sin is True.")
@@ -97,22 +97,22 @@ class CosineEmbedding(BaseComponent):
         self.register_buffer("freqs", freqs)
         self.do_sin = do_sin
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         return self._freq_dim * (2 if self.do_sin else 1)
 
-    @override
     @property
+    @override
     def in_features(self) -> int | None:
         return None
 
     def _check_bounds(self, x: jt.Float[th.Tensor, "..."], epsilon=1e-6):
         assert th.all(
-            x >= self.min_value - epsilon
+            x >= self.min_value - epsilon  # type: ignore
         ), f"Input {x} below min value {self.min_value}"
         assert th.all(
-            x <= self.max_value + epsilon
+            x <= self.max_value + epsilon  # type: ignore
         ), f"Input {x} above max value {self.max_value}"
 
     def forward(
@@ -126,7 +126,8 @@ class CosineEmbedding(BaseComponent):
             (..., out_dim) tensor of cosine features
         """
         self._check_bounds(x)
-        x = (x - self.min_value) / self.range  # Normalize to [0, 1]
+        # Normalize to [0, 1]
+        x = (x - self.min_value) / self.range  # type: ignore  
         x = th.einsum("..., d -> ... d", x, self.freqs)  # (..., D)
 
         if self.do_sin:
@@ -139,6 +140,6 @@ class CosineEmbedding(BaseComponent):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(out_dim={self.out_features}, "
-            f"min_value={self.min_value.item()}, max_value={self.max_value.item()}, "
+            f"min_value={self.min_value.item()}, max_value={self.max_value.item()}, "  # type: ignore
             f"do_sin={self.do_sin})"
         )

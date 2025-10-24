@@ -1,5 +1,6 @@
 from dataclasses import replace
 from functools import partial
+from typing import cast
 
 import torch as th
 from torch import nn
@@ -54,6 +55,7 @@ class PackedSelfAttention(BaseComponent):
             ValueError: If dimension is not divisible by nheads.
         """
         config = config if exists(config) else SelfAttentionConfig()
+        assert isinstance(config, SelfAttentionConfig)
         super().__init__()
         if in_features % config.nheads != 0:
             raise ValueError("dimension must be divisible by nheads")
@@ -143,16 +145,18 @@ class PackedSelfAttention(BaseComponent):
             # Separate projections for Q, K, V
             q, k, v = self._qkv_proj(x)
             if self._include_qk_norm:
+                assert self._qk_norm is not None
                 q, k = self._qk_norm(q, k)
             qkv = q, k, v
         else:
             qkv = self._convert_to_headed_and_merged_layout(self._qkv_proj(x))
             # Combined projection for Q, K, V
             if self._include_qk_norm:
+                assert self._qk_norm is not None
                 q, k, v = th.unbind(qkv, dim=1)
                 q, k = self._qk_norm(q, k)
                 qkv = q, k, v
-        return qkv
+        return qkv  # type: ignore
 
     def init_weights(
         self,
@@ -177,7 +181,7 @@ class PackedSelfAttention(BaseComponent):
         proj_std = (
             init_proj_std
             if init_proj_std is not None
-            else init_qkv_std * factor
+            else cast("float", init_qkv_std) * factor
         )
 
         self._qkv_proj.init_weights(
@@ -202,12 +206,12 @@ class PackedSelfAttention(BaseComponent):
             else torch_flash_attention_interface
         )
 
-    @override
     @property
+    @override
     def in_features(self) -> int:
         return self._dimension
 
-    @override
     @property
+    @override
     def out_features(self) -> int:
         return self._dimension

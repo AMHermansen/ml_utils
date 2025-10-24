@@ -55,7 +55,9 @@ def setup_layer_scale(config: ResidualConfig | None, dim: int) -> nn.Parameter |
     if config.layer_scale_init_method == "constant":
         return nn.Parameter(config.layer_scale_init_epsilon * th.ones(dim))
     if config.layer_scale_init_method == "uniform":
-        return nn.Parameter(th.empty(dim).uniform_(0, 2 * config.layer_scale_init_epsilon))
+        return nn.Parameter(
+            th.empty(dim).uniform_(0, 2 * config.layer_scale_init_epsilon)
+        )
     raise ValueError(f"Unknown init_method: {config.layer_scale_init_method}")
 
 
@@ -66,17 +68,15 @@ class Residual(Wrapper):
         component (BaseComponent): Wrapped component.
         config (ResidualConfig | None): Configuration for residual wrapper.
     """
-    _base_local_attrs: ClassVar[set[str]] = (
-        Wrapper._base_local_attrs
-        | {
-            "_config",
-            "norm",
-            "layer_scale",
-            "drop_path_rate",
-            "input_format",
-            "dropout_rate",
-        }
-    )
+
+    _base_local_attrs: ClassVar[set[str]] = Wrapper._base_local_attrs | {
+        "_config",
+        "norm",
+        "layer_scale",
+        "drop_path_rate",
+        "input_format",
+        "dropout_rate",
+    }
 
     def __init__(
         self,
@@ -91,10 +91,11 @@ class Residual(Wrapper):
         """
         super().__init__(component)
         config = config if exists(config) else ResidualConfig()
+        assert isinstance(config, ResidualConfig)
         self._config = config
         self.drop_path_rate = config.drop_path_rate
         self.dropout_rate = config.dropout_rate
-        self.input_format = config.input_format
+        self.input_format: Literal["packed", "unpacked"] = config.input_format
         if config.norm_name == "layer":
             self.norm = nn.LayerNorm(
                 self.in_features,
@@ -103,9 +104,7 @@ class Residual(Wrapper):
             )
         elif config.norm_name == "rms":
             self.norm = nn.RMSNorm(
-                self.in_features,
-                elementwise_affine=False,
-                eps=config.norm_eps
+                self.in_features, elementwise_affine=False, eps=config.norm_eps
             )
         elif not exists(config.norm_name):
             self.norm = nn.Identity()
@@ -121,8 +120,8 @@ class Residual(Wrapper):
         """Whether layer scaling is applied."""
         return self.layer_scale is not None
 
-    @override
     @property
+    @override
     def _local_attrs(self) -> set[str]:
         return self._base_local_attrs
 
@@ -143,7 +142,6 @@ class Residual(Wrapper):
             self.dropout_rate,
             self.training,
         )
-
         if self._config.input_format == "packed" and self.drop_path_rate > 0.0:
             assert "cu_seqlens" in kwargs, (
                 "cu_seqlens must be provided for packed input format."
@@ -173,20 +171,18 @@ class ResidualWithContext(Wrapper):
     If context is provided, it is used for adaptive normalisation and gating.
     Gating is always initialised as zero, so the module is initially bypassed.
     """
-    _base_local_attrs: ClassVar[set[str]] = (
-        Wrapper._base_local_attrs
-        | {
-            "_context_dim",
-            "_config",
-            "norm",
-            "scale",
-            "shift",
-            "layer_scale_gate",
-            "drop_path_rate",
-            "input_format",
-            "dropout_rate",
-        }
-    )
+
+    _base_local_attrs: ClassVar[set[str]] = Wrapper._base_local_attrs | {
+        "_context_dim",
+        "_config",
+        "norm",
+        "scale",
+        "shift",
+        "layer_scale_gate",
+        "drop_path_rate",
+        "input_format",
+        "dropout_rate",
+    }
 
     def __init__(
         self,
@@ -205,9 +201,10 @@ class ResidualWithContext(Wrapper):
         if context_dim <= 0:
             raise ValueError(f"context_dim must be positive: {context_dim}")
         config = config if exists(config) else ResidualConfig()
+        assert isinstance(config, ResidualConfig)
         self.drop_path_rate = config.drop_path_rate
         self.dropout_rate = config.dropout_rate
-        self.input_format = config.input_format
+        self.input_format: Literal["packed", "unpacked"] = config.input_format
         self._context_dim = context_dim
         self._config = config
         self._setup_layer_scale(config)
@@ -234,8 +231,8 @@ class ResidualWithContext(Wrapper):
         """Dimension of the context vector."""
         return self._context_dim
 
-    @override
     @property
+    @override
     def _local_attrs(self) -> set[str]:
         return self._base_local_attrs
 
@@ -265,7 +262,8 @@ class ResidualWithContext(Wrapper):
                     f"Unknown init_method: {self._config.layer_scale_init_method}"
                 )
         if hasattr(self.wrapped_component, "reset_parameters"):
-            self.wrapped_component.reset_parameters()
+            # pyright thinks all attributes are Tensors...
+            self.wrapped_component.reset_parameters()  # type: ignore
 
     def __repr__(self) -> str:
         return f"Context-Residual{self.component}"

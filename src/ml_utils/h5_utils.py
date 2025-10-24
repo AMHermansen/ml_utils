@@ -1,3 +1,4 @@
+import h5py
 import numpy as np
 from h5py import File
 
@@ -24,7 +25,9 @@ def load_packed_datasets(
     """
     start_idx = cumulative_lengths[idx]
     end_idx = cumulative_lengths[idx + chunk_size]
-    return h5_file[target_dataset_name][start_idx:end_idx]
+    dataset = h5_file[target_dataset_name]
+    assert isinstance(dataset, h5py.Dataset)
+    return dataset[start_idx:end_idx]
 
 
 def load_fixed_datasets(
@@ -46,4 +49,6 @@ def load_fixed_datasets(
     """
     start_idx = idx
     end_idx = idx + chunk_size
-    return h5_file[target_dataset_name][start_idx:end_idx]
+    dataset = h5_file[target_dataset_name]
+    assert isinstance(dataset, h5py.Dataset)
+    return dataset[start_idx:end_idx]

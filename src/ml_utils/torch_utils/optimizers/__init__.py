@@ -10,7 +10,7 @@ except ImportError:
     logger.warning(
         "lion_pytorch is not installed. Please install it to use the Lion optimizer."
     )
-    Lion = None
+    Lion: None = None
 
 
 __all__ = [
