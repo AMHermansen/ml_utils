@@ -87,7 +87,7 @@ class TransformerDecoder(BaseComponent):
         cu_seqlens_kv: CulensTensor,
         max_seqlen_q: int | None = None,
         max_seqlen_kv: int | None = None,
-    ) -> PackedTensor:
+    ) -> tuple[PackedTensor, CulensTensor, int | None]:
         """Forward pass through the Transformer block.
 
 
@@ -124,7 +124,7 @@ class TransformerDecoder(BaseComponent):
                 max_seqlen_q=max_seqlen_q,
                 max_seqlen_kv=max_seqlen_kv,
             )
-        return q_sequence
+        return self.maybe_remove_registers(q_sequence, cu_seqlens_q, max_seqlen_q)
 
     def maybe_add_registers(
         self,
