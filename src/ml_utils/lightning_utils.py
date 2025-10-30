@@ -12,7 +12,7 @@ from lightning.pytorch.cli import SaveConfigCallback
 from lightning.pytorch.loggers import WandbLogger
 from typing_extensions import override
 
-from ml_utils.torch_utils.optimizers import Muon, suitable_for_muon
+from ml_utils.torch_utils.optim import Muon, suitable_for_muon
 from ml_utils.utils import exists
 
 if TYPE_CHECKING:
