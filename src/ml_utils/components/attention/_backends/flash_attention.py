@@ -138,6 +138,10 @@ def common_flash_attention_interface(
     flash_attn_kwargs = (
         flash_attn_kwargs if flash_attn_kwargs is not None else FlashAttentionKWArgs()
     )
+    # Ensure cu_seqlens_q is int32, as required by flash attention.
+    if cu_seqlens_q.dtype != th.int32:
+        cu_seqlens_q = cu_seqlens_q.to(th.int32)
+
     flash_attn_impl, cross_attention_possible = detect_qkv_structure(qkv)
     original_qkv_type = get_qkv_dtype(qkv)
     if original_qkv_type not in {th.float16, th.bfloat16}:
@@ -164,6 +168,10 @@ def common_flash_attention_interface(
         cu_seqlens_k = cu_seqlens_q
     if max_seqlen_k is None:
         max_seqlen_k = int(th.max(th.diff(cu_seqlens_k)).item())
+
+    # Ensure cu_seqlens_k is int32, as required by flash attention.
+    if cu_seqlens_k.dtype != th.int32:
+        cu_seqlens_k = cu_seqlens_k.to(th.int32)
 
     # Directly call flash_attn_impl with the provided arguments.
     return flash_attn_impl(
