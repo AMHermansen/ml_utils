@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Andreas Hermansen", email = "mail@andreashermansen.dk" }
+    { name = "Andreas Hermansen", email = "andreas.hermansen@unige.ch" }
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -25,7 +25,6 @@ dev = [
     "pyright[nodejs]>=1.1.406",
     "pytest>=8.4.2",
     "ruff>=0.14.1",
-    "ty>=0.0.1a24",
 ]
 
 [build-system]
@@ -53,7 +52,7 @@ lint.ignore = [
     "D100", "S105", "EM", "D103", "INP", "N803", "N806", "PLW1514", "PD011",
     "B905", "ANN202", "COM", "PLR0915", "ARG001", "S311", "RUF015", "TD003",
     "DOC201", "PD901", "F811", "PLR6104", "TRY002", "S101", "DOC402", "PGH003",
-    "F722",  # Causes issues with jaxtyping
+    "F722", # Causes issues with jaxtyping. See https://docs.kidger.site/jaxtyping/faq/
 ]
 
 [tool.ruff.lint.pydocstyle]
