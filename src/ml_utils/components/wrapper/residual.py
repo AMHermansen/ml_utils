@@ -30,7 +30,7 @@ class ResidualConfig:
         layer_scale_init_method: Method for initializing layer scaling.
     """
 
-    norm_name: Literal["layer", "rms"] | None = "layer"
+    norm_name: Literal["layer", "rms"] | None = "rms"
     norm_eps: float = 1e-5
     use_layer_scale: bool = True
     layer_scale_init_epsilon: float = 1e-5
