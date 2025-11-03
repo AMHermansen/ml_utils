@@ -106,7 +106,7 @@ def configure_muon_optimizer(
         "params": muon_params,
         "lr": lightning_config.optimizer_kwargs.get(
             "muon_lr",
-            0.05,
+            0.001,
         ),
         "momentum": lightning_config.optimizer_kwargs.get(
             "muon_momentum",
@@ -114,7 +114,7 @@ def configure_muon_optimizer(
         ),
         "weight_decay": lightning_config.optimizer_kwargs.get(
             "muon_weight_decay",
-            0.0,
+            0.01,
         ),
         "use_muon": True,
     }
@@ -123,7 +123,7 @@ def configure_muon_optimizer(
         "params": chain(adam_params1, adam_params2),
         "lr": lightning_config.optimizer_kwargs.get(
             "adam_lr",
-            0.02,
+            3e-4,
         ),
         "betas": lightning_config.optimizer_kwargs.get(
             "adam_betas",
@@ -133,7 +133,7 @@ def configure_muon_optimizer(
             "adam_eps",
             1e-10,
         ),
-        "weight_decay": lightning_config.optimizer_kwargs.get("adam_weight_decay", 0.0),
+        "weight_decay": lightning_config.optimizer_kwargs.get("adam_weight_decay", 0.01),
         "use_muon": False,
     }
     optimizer = Muon([muon_group, adam_group])
