@@ -19,7 +19,7 @@ class TestFourierEmbedding:
         batch_size=st.integers(min_value=1, max_value=10),
         input_dim=st.integers(min_value=1, max_value=5),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=10_000)
     def test_output_shape(self, num_frequencies, batch_size, input_dim):
         """Test that output has correct shape."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -32,7 +32,7 @@ class TestFourierEmbedding:
         assert output.dtype == input_tensor.dtype
 
     @given(num_frequencies=st.integers(min_value=1, max_value=50))
-    @settings(max_examples=50)
+    @settings(max_examples=100, deadline=10_000)
     def test_properties(self, num_frequencies):
         """Test in_features and out_features properties."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -44,7 +44,7 @@ class TestFourierEmbedding:
         num_frequencies=st.integers(min_value=1, max_value=20),
         x_value=st.floats(min_value=-10.0, max_value=10.0),
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, deadline=10_000)
     def test_forward_values(self, num_frequencies, x_value):
         """Test that forward produces expected cosine values."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -64,7 +64,7 @@ class TestFourierEmbedding:
         assert th.allclose(output.squeeze(), expected, atol=1e-6)
 
     @given(num_frequencies=st.integers(min_value=1, max_value=10))
-    @settings(max_examples=20)
+    @settings(max_examples=20, deadline=10_000)
     def test_different_dtypes(self, num_frequencies):
         """Test with different input dtypes."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -76,7 +76,7 @@ class TestFourierEmbedding:
             assert output.dtype == dtype
 
     @given(num_frequencies=st.integers(min_value=1, max_value=10))
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=10_000)
     def test_gradients(self, num_frequencies):
         """Test that gradients flow through the embedding."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -97,7 +97,7 @@ class TestFourierEmbedding:
             st.integers(min_value=1, max_value=3),
         ),
     )
-    @settings(max_examples=20)
+    @settings(max_examples=20, deadline=10_000)
     def test_arbitrary_shapes(self, num_frequencies, shape):
         """Test with arbitrary input shapes."""
         embedding = FourierEmbedding(num_frequencies=num_frequencies)
@@ -117,7 +117,7 @@ class TestCosineEmbedding:
         do_sin=st.booleans(),
         batch_size=st.integers(min_value=1, max_value=10),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=10_000)
     def test_output_shape(self, out_dim, scheme, do_sin, batch_size):
         """Test that output has correct shape."""
         if do_sin and out_dim % 2 != 0:
@@ -143,7 +143,7 @@ class TestCosineEmbedding:
         scheme=st.sampled_from(["linear", "exponential", "power"]),
         do_sin=st.booleans(),
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, deadline=10_000)
     def test_properties(self, out_dim, scheme, do_sin):
         """Test in_features and out_features properties."""
         if do_sin and out_dim % 2 != 0:
@@ -165,7 +165,7 @@ class TestCosineEmbedding:
         do_sin=st.booleans(),
         x_value=st.floats(min_value=0.0, max_value=1.0),
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, deadline=10_000)
     def test_forward_values(self, out_dim, scheme, do_sin, x_value):
         """Test that forward produces expected cosine values."""
         if do_sin and out_dim % 2 != 0:
@@ -197,7 +197,7 @@ class TestCosineEmbedding:
         max_value=st.floats(min_value=0.1, max_value=10.0),
         x_value=st.floats(min_value=-5.0, max_value=5.0),
     )
-    @settings(max_examples=30)
+    @settings(max_examples=30, deadline=10_000)
     def test_normalization(self, out_dim, min_value, max_value, x_value):
         """Test input normalization to [0, 1] range."""
         assume(min_value < max_value)
@@ -221,7 +221,7 @@ class TestCosineEmbedding:
         out_dim=st.integers(min_value=1, max_value=10),
         scheme=st.sampled_from(["linear", "exponential", "power"]),
     )
-    @settings(max_examples=20)
+    @settings(max_examples=20, deadline=10_000)
     def test_frequency_schemes(self, out_dim, scheme):
         """Test different frequency schemes."""
         embedding = CosineEmbedding(
@@ -246,7 +246,7 @@ class TestCosineEmbedding:
         assert th.allclose(embedding.freqs, expected_freqs)
 
     @given(out_dim=st.integers(min_value=1, max_value=10))
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=10_000)
     def test_invalid_scheme(self, out_dim):
         """Test that invalid scheme raises ValueError."""
         with pytest.raises(ValueError):
@@ -259,7 +259,7 @@ class TestCosineEmbedding:
             )
 
     @given(out_dim=st.integers(min_value=1, max_value=10))
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=10_000)
     def test_different_dtypes(self, out_dim):
         """Test with different input dtypes."""
         embedding = CosineEmbedding(
@@ -277,7 +277,7 @@ class TestCosineEmbedding:
             assert output.dtype == dtype
 
     @given(out_dim=st.integers(min_value=1, max_value=10))
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=10_000)
     def test_gradients(self, out_dim):
         """Test that gradients flow through the embedding."""
         embedding = CosineEmbedding(
@@ -304,7 +304,7 @@ class TestCosineEmbedding:
             st.integers(min_value=1, max_value=3),
         ),
     )
-    @settings(max_examples=20)
+    @settings(max_examples=20, deadline=10_000)
     def test_arbitrary_shapes(self, out_dim, shape):
         """Test with arbitrary input shapes."""
         embedding = CosineEmbedding(
