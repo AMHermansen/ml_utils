@@ -9,8 +9,8 @@ import torch as th
 
 from ml_utils.torch_utils.misc import ParameterNoWeightDecay
 
-
 logger = logging.getLogger(__name__)
+
 
 class AdamWS(th.optim.AdamW):
     """AdamW optimizer where weight decay is only applied to matrices.

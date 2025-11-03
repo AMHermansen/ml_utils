@@ -18,11 +18,11 @@ https://github.com/KellerJordan/Muon
 This file also includes code based on:
 https://github.com/mattcleigh/mltools
 """
-from typing import Callable
-from typing_extensions import override
+from collections.abc import Callable
 
 import torch as th
 from torch import nn
+from typing_extensions import override
 
 from ml_utils.torch_utils.misc import ParameterNoWeightDecay
 

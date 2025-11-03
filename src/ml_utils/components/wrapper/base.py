@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, cast, ClassVar
+from typing import Any, ClassVar, cast
 
 import jaxtyping as jt
 import torch as th
