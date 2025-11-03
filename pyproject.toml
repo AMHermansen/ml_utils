@@ -11,13 +11,15 @@ dependencies = [
     "jaxtyping>=0.3.2",
     "lightning>=2.5.5",
     "torch>=2.8.0",
-    "flash-attn>=2.8.2",
     "h5py>=3.15.1",
 ]
 
 [project.optional-dependencies]
 lion = [
     "lion-pytorch>=0.2.3",
+]
+flash-attn = [
+    "flash-attn>=2.8.2",
 ]
 [dependency-groups]
 dev = [
