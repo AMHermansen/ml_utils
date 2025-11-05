@@ -66,11 +66,6 @@ def configure_optimizer_standard(
     config = {
         "optimizer": optimizer,
     }
-    scheduler_config = (
-        lightning_config.scheduler_config
-        if exists(lightning_config.scheduler_config)
-        else {}
-    )
     if lightning_config.scheduler_class is not None:
         scheduler = lightning_config.scheduler_class(
             optimizer, **lightning_config.scheduler_kwargs
@@ -152,3 +147,15 @@ def configure_muon_optimizer(
             }
         })
     return config
+
+
+def foo(x: int) -> int:
+    """Foo.
+
+    Args:
+        x: bar.
+
+    Returns: baz
+
+    """
+    return None
