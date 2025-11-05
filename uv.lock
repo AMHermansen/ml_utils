@@ -430,7 +430,6 @@ name = "ml-utils"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "flash-attn" },
     { name = "h5py" },
     { name = "jaxtyping" },
     { name = "lightning" },
@@ -438,6 +437,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+flash-attn = [
+    { name = "flash-attn" },
+]
 lion = [
     { name = "lion-pytorch" },
 ]
@@ -452,14 +454,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flash-attn", specifier = ">=2.8.2" },
+    { name = "flash-attn", marker = "extra == 'flash-attn'", specifier = ">=2.8.2" },
     { name = "h5py", specifier = ">=3.15.1" },
     { name = "jaxtyping", specifier = ">=0.3.2" },
     { name = "lightning", specifier = ">=2.5.5" },
     { name = "lion-pytorch", marker = "extra == 'lion'", specifier = ">=0.2.3" },
     { name = "torch", specifier = ">=2.8.0" },
 ]
-provides-extras = ["lion"]
+provides-extras = ["lion", "flash-attn"]
 
 [package.metadata.requires-dev]
 dev = [
