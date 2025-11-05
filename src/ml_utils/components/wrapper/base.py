@@ -56,7 +56,8 @@ class Wrapper(BaseComponent):
     @override
     def in_features(self) -> int:
         """Input dimension of this module."""
-        return cast("int", self.wrapped_component.in_features)
+        assert isinstance(self.wrapped_component.in_features, int), "Expected in_features to be an int"
+        return self.wrapped_component.in_features
 
     @property
     @override
