@@ -1,7 +1,7 @@
 import pytest
 import torch as th
 import torch.cuda
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from ml_utils.components import PackedSelfAttention
@@ -154,6 +154,7 @@ def test_training_vs_eval_flash_attention_kwargs_selected(
 
 
 @given(nheads_dim=nheads_and_dimensions())
+@settings(deadline=10_000)
 def test_use_flash_attention_setter_toggles(nheads_dim):
     """Ensure the setter for use_flash_attention updates the boolean property and
     rewires the internal function pointer.

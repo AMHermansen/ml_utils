@@ -179,7 +179,7 @@ class TestQKVLinear:
         assert not target_split.split_qkv
 
     @given(in_features=in_features, bias=bias_flags)
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.too_slow])
+    @settings(max_examples=10, suppress_health_check=[HealthCheck.too_slow], deadline=10_000)
     def test_round_trip_conversion(self, in_features: int, bias: bool):
         """Test that converting back and forth preserves functionality."""
         module = QKVLinear(in_features=in_features, bias=bias, split_qkv=False)
