@@ -70,6 +70,29 @@ def pack_tensors(
     return cu_seqlens, tuple(packed_tensors)
 
 
+def pack_tensor(
+    mask: MaskTensor,
+    tensor: GeneralBatchedTensor,
+) -> tuple[CulensTensor, GeneralPackedTensor]:
+    """Pack a single tensor based on the provided mask.
+
+    Provides a convenient wrapper around `pack_tensors` for a single tensor. To avoid
+    unnecessary tuple packing/unpacking.
+
+    Args:
+        mask: Boolean mask indicating valid entries. Shape (B, N).
+        tensor: Tensor to be packed. Should have shape (B, N, ..., F).
+
+    Returns:
+        cu_seqlens:
+            Cumulative sequence lengths. Shape (B+1,).
+        packed_tensor:
+            Packed tensor with shape (total_valid_entries, ..., F).
+    """
+    cu_seqlens, (packed_tensor,) = pack_tensors(mask, tensor)
+    return cu_seqlens, packed_tensor
+
+
 def unpack_tensors(
     cu_seqlens: CulensTensor,
     *tensors: GeneralPackedTensor,
@@ -115,6 +138,37 @@ def unpack_tensors(
         batched_tensor[mask] = tensor
         batched_tensors.append(batched_tensor)
     return mask, tuple(batched_tensors)
+
+
+def unpack_tensor(
+    cu_seqlens: CulensTensor,
+    tensor: GeneralPackedTensor,
+    *,
+    max_length: int | None = None,
+) -> tuple[MaskTensor, GeneralBatchedTensor]:
+    """Unpack a single tensor based on the provided cumulative sequence lengths.
+
+    Provides a convenient wrapper around `unpack_tensors` for a single tensor. To avoid
+    unnecessary tuple packing/unpacking.
+
+    Args:
+        cu_seqlens: Cumulative sequence lengths. Shape (B+1,).
+        tensor: Tensor to be unpacked. Should have shape (total_valid_entries, F).
+        max_length: Maximum length to pad the sequences to. If None, uses the
+            maximum sequence length in the batch. Keyword only to avoid confusion with
+            unpack_tensors signature.
+    Returns:
+        mask:
+            Boolean mask indicating valid entries. Shape (B, N).
+        batched_tensor:
+            Unpacked tensor with shape (B, N, ..., F).
+    """
+    mask, (batched_tensor,) = unpack_tensors(
+        cu_seqlens,
+        tensor,
+        max_length=max_length
+    )
+    return mask, batched_tensor
 
 
 def prepend_tokens_to_packed_tensor(

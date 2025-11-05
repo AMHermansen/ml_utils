@@ -5,7 +5,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as hnp
 
-from ml_utils.torch_utils.packing import pack_tensors, unpack_tensors
+from ml_utils.torch_utils.packing import pack_tensors, unpack_tensors, pack_tensor, unpack_tensor
 
 # Helpers & strategies -------------------------------------------------------
 
@@ -475,3 +475,59 @@ def test_pack_accepts_tensors_with_different_trailing_shapes(B, N, F):
     assert th.equal(cu, cu2)
     assert th.allclose(p1, p1b, rtol=1e-6, atol=1e-6)
     assert th.allclose(p2, p2b, rtol=1e-6, atol=1e-6)
+
+
+# Test pack_tensor and unpack_tensor
+# Just testing that they behave the same as pack_tensors and unpack_tensors for single
+# tensors, and then extensive testing is already done above.
+
+
+@given(cu_and_packed=cu_seqlens_and_packed())
+def test_unpack_tensor_equals_unpack_tensors(cu_and_packed):
+    """
+    Test that unpack_tensor produces the same result as unpack_tensors for a single tensor.
+    """
+    cu_seqlens, packed = cu_and_packed
+    print(cu_seqlens.shape)
+    print(packed.shape)
+    mask1, (batched1,) = unpack_tensors(cu_seqlens, packed, max_length=None)
+    mask2, batched2 = unpack_tensor(cu_seqlens, packed, max_length=None)
+
+    assert th.equal(mask1, mask2)
+    assert th.allclose(batched1, batched2, rtol=1e-6, atol=1e-6)
+
+
+
+@given(
+    B=batch_sizes,
+    N=lengths,
+    F=feat_dims,
+    data=st.data(),
+)
+def test_pack_tensor_equals_pack_tensors(B, N, F, data):
+    """
+    Test that pack_tensor produces the same result as pack_tensors for a single tensor.
+    """
+    mask_np = data.draw(
+        hnp.arrays(dtype=np.bool_, shape=(B, N), elements=st.booleans())
+    )
+    if not mask_np.any():
+        i = data.draw(st.integers(0, B - 1))
+        j = data.draw(st.integers(0, N - 1))
+        mask_np[i, j] = True
+
+    arr = data.draw(
+        hnp.arrays(dtype=np.float32, shape=(B, N, F), elements=float_elements)
+    )
+
+    mask = th.from_numpy(mask_np)
+    batched = th.from_numpy(arr)
+
+    print(mask.shape)
+    print(batched.shape)
+
+    cu1, (packed1,) = pack_tensors(mask, batched)
+    cu2, packed2 = pack_tensor(mask, batched)
+
+    assert th.equal(cu1, cu2)
+    assert th.allclose(packed1, packed2, rtol=1e-6, atol=1e-6)
