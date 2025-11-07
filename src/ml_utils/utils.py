@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from functools import wraps
 from typing import Any, TypeGuard, TypeVar
 
 T = TypeVar("T")
@@ -41,6 +42,7 @@ def maybe(func: Callable[[T], R | None]) -> Callable[[T | None], R | None]:
     Returns:
         A new function that applies func to its argument if it exists.
     """
+    @wraps(func)
     def wrapper(value: T | None) -> R | None:
         return maybe_apply(func, value)
 
