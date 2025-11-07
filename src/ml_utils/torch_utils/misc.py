@@ -96,7 +96,7 @@ def recurse_and_apply(
 
 def convert_to_torch(
     data_collection: Any,
-    device: th.device | str | None = None,
+    device: th.device | str = "cpu",
 ):
     """Converts all numpy arrays in a nested collection to PyTorch tensors."""
 
