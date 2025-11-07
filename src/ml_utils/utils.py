@@ -18,6 +18,21 @@ def exists(value: T | None) -> TypeGuard[T]:
     return value is not None
 
 
+def default(value: T | None, default_value: T) -> T:
+    """Return the value if it exists, otherwise return the default value.
+
+    Args:
+        value: The value to check.
+        default_value: The default value to return if value is None.
+
+    Returns:
+        The value if it exists, otherwise the default value.
+    """
+    if exists(value):
+        return value
+    return default_value
+
+
 def maybe_apply(func: Callable[[T], R | None], value: T | None) -> R | None:
     """Apply a function to a value if it exists (is not None).
 
