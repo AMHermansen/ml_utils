@@ -4,18 +4,28 @@
 # Licensed under the MIT License (See LICENSE file for details).
 
 """Miscellaneous pytorch utility functions."""
-from typing import cast
 
+from collections.abc import Callable
+from typing import Any, cast
+
+import numpy as np
 import torch as th
 from torch import nn
 
 from ml_utils.torch_utils.types import CulensTensor
 
 
+# Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
+class ParameterNoWeightDecay(nn.Parameter):
+    """A parameter that is excluded from weight decay.
+
+    This only works when used with optimizers from `ml_utils.torch_utils.optimizers`.
+    """
+
+
+# Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
 def append_dimensions(x: th.Tensor, target_dimensions: int, dim: int = -1) -> th.Tensor:
     """Appends dimensions of size 1 to a tensor until it reaches the target number of dimensions.
-
-    Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
 
     Args:
         x (th.Tensor): The input tensor.
@@ -54,10 +64,61 @@ def is_increasing_sequence(cu_seqlens: CulensTensor) -> bool:
     return cast("bool", th.all(th.diff(cu_seqlens) >= 0).item())
 
 
-class ParameterNoWeightDecay(nn.Parameter):
-    """A parameter that is excluded from weight decay.
+def recurse_and_apply(
+    collection: Any,
+    func: Callable[[Any], Any],
+    target_type: type | tuple[type, ...],
+):
+    """Recursively applies a function to all elements in a nested collection.
 
-    This only works when used with optimizers from `ml_utils.torch_utils.optimizers`.
+    Args:
+        collection (Any): The input collection (can be a list, tuple, dict, or other).
+        func (Callable[[Any], Any]): The function to apply to each element.
+        target_type (type): The type of elements to which the function should be
+            applied.
 
-    Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
+    Returns:
+        Any: The collection with the function applied to each element.
     """
+    if isinstance(collection, target_type):
+        return func(collection)
+    if isinstance(collection, list):
+        return [recurse_and_apply(item, func, target_type) for item in collection]
+    if isinstance(collection, tuple):
+        return tuple(recurse_and_apply(item, func, target_type) for item in collection)
+    if isinstance(collection, dict):
+        return {
+            key: recurse_and_apply(value, func, target_type)
+            for key, value in collection.items()
+        }
+    return collection
+
+
+def convert_to_torch(
+    data_collection: Any,
+    device: th.device | str | None = None,
+):
+    """Converts all numpy arrays in a nested collection to PyTorch tensors."""
+
+    def to_torch(x: np.ndarray | th.Tensor) -> th.Tensor:
+        if isinstance(x, th.Tensor):
+            return x.to(device=device)
+        return th.tensor(x, device=device)
+
+    return recurse_and_apply(data_collection, to_torch, (np.ndarray, th.Tensor))
+
+
+def convert_to_numpy(data_collection: Any):
+    """Converts all PyTorch tensors in a nested collection to numpy arrays.
+
+    This function has to convert bfloat16 tensors to a different dtype, since bfloat16
+    isn't support by numpy. The chosen dtype is float32, to capture the full range of
+    bfloat16.
+    """
+
+    def to_numpy(x: th.Tensor) -> np.ndarray:
+        if x.dtype == th.bfloat16:
+            x = x.to(th.float32)
+        return x.detach().cpu().numpy()
+
+    return recurse_and_apply(data_collection, to_numpy, th.Tensor)
