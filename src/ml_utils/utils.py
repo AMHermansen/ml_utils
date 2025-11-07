@@ -1,7 +1,11 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeGuard, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
 
 
-def exists(value: Any) -> bool:
+def exists(value: T | None) -> TypeGuard[T]:
     """Check if a value is not None.
 
     Args:
@@ -11,6 +15,36 @@ def exists(value: Any) -> bool:
         bool: True if the value is not None, False otherwise.
     """
     return value is not None
+
+
+def maybe_apply(func: Callable[[T], R | None], value: T | None) -> R | None:
+    """Apply a function to a value if it exists (is not None).
+
+    Args:
+        func: The function to apply.
+        value: The value to check and potentially apply the function to.
+
+    Returns:
+        The result of func(value) if value exists, otherwise None.
+    """
+    if exists(value):
+        return func(value)
+    return None
+
+
+def maybe(func: Callable[[T], R | None]) -> Callable[[T | None], R | None]:
+    """Decorator around maybe_apply.
+
+    Args:
+        func: The function to apply.
+
+    Returns:
+        A new function that applies func to its argument if it exists.
+    """
+    def wrapper(value: T | None) -> R | None:
+        return maybe_apply(func, value)
+
+    return wrapper
 
 
 def maybe_add(a: Any, b: Any) -> Any:
