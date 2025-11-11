@@ -18,8 +18,9 @@ class QKVLinear(nn.Module):
     This module can switch between using a separate linear layer for each qkv,
     or a single linear layer that outputs all three concatenated.
     The reason for this somewhat unusual/ugly design, is that for flash attention
-    the merged qkv projection is more performant, while the muon optimizer operates
-    better with separate projections. See https://kellerjordan.github.io/posts/muon/.
+    the merged qkv projection is more performant, while the muon optimizer might
+    operate better with separate projections.
+    See https://kellerjordan.github.io/posts/muon/.
 
     To have a cleaner attention interface, the swapping between split and merged
     projections is handled internally in this module.
@@ -181,7 +182,8 @@ class QKVLinear(nn.Module):
 
         self._split_qkv = split
 
-    def init_weights(self, init_std: float | None = None) -> None:
+    # Same method as for Component modules.
+    def reset_parameters(self, init_std: float | None = None) -> None:
         """Initialize the weights of the linear layers.
 
         Args:

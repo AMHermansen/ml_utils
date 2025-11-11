@@ -185,7 +185,7 @@ class TestQKVLinear:
         module = QKVLinear(in_features=in_features, bias=bias, split_qkv=False)
 
         # Initialize and create test input
-        module.init_weights()
+        module.reset_parameters()
         x = th.randn(2, in_features)
 
         # Get output in merged mode

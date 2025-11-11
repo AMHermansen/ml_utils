@@ -158,7 +158,8 @@ class PackedSelfAttention(BaseComponent):
                 qkv = q, k, v
         return qkv  # type: ignore
 
-    def init_weights(
+    @override
+    def reset_parameters(
         self,
         init_qkv_std: float | None = None,
         init_proj_std: float | None = None,
@@ -184,7 +185,7 @@ class PackedSelfAttention(BaseComponent):
             else cast("float", init_qkv_std) * factor
         )
 
-        self._qkv_proj.init_weights(
+        self._qkv_proj.reset_parameters(
             init_std=init_qkv_std,
         )
         nn.init.normal_(self._out_proj.weight, std=proj_std)
