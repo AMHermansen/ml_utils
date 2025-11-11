@@ -430,6 +430,7 @@ name = "ml-utils"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "einops" },
     { name = "h5py" },
     { name = "jaxtyping" },
     { name = "lightning" },
@@ -454,6 +455,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "einops", specifier = ">=0.8.1" },
     { name = "flash-attn", marker = "extra == 'flash-attn'", specifier = ">=2.8.2" },
     { name = "h5py", specifier = ">=3.15.1" },
     { name = "jaxtyping", specifier = ">=0.3.2" },
