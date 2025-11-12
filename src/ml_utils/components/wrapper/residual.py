@@ -186,18 +186,18 @@ class ResidualWithContext(Wrapper):
 
     def __init__(
         self,
-        component: BaseComponent,
+        wrapped_component: BaseComponent,
         context_dim: int,
         config: ResidualConfig | None = None,
     ) -> None:
         """Initialises the ResidualWithContext module.
 
         Args:
-            component: Wrapped component.
+            wrapped_component: Wrapped component.
             context_dim: Dimension of the context vector.
             config: Configuration for residual wrapper.
         """
-        super().__init__(component)
+        super().__init__(wrapped_component=wrapped_component)
         if context_dim <= 0:
             raise ValueError(f"context_dim must be positive: {context_dim}")
         config = config if exists(config) else ResidualConfig()
@@ -266,7 +266,7 @@ class ResidualWithContext(Wrapper):
             self.wrapped_component.reset_parameters()  # type: ignore
 
     def __repr__(self) -> str:
-        return f"Context-Residual{self.component}"
+        return f"Context-Residual{self.wrapped_component}"
 
     def forward(
         self,
