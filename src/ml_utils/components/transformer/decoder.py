@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
-from typing import cast
+from typing import TypeAlias, cast, overload
 
+import jaxtyping as jt
 import torch as th
 from torch import nn
 from typing_extensions import override
@@ -15,6 +16,9 @@ from ml_utils.torch_utils.types import CulensTensor, PackedTensor
 from ml_utils.utils import exists, maybe_add, maybe_subtract
 
 from .decoder_block import TransformerDecoderBlock, TransformerDecoderBlockConfig
+
+PackedContextTensor: TypeAlias = jt.Float[th.Tensor, " packed_length context_dim"]
+BatchedContextTensor: TypeAlias = jt.Float[th.Tensor, " batch_size context_dim"]
 
 
 @dataclass
@@ -50,16 +54,19 @@ class TransformerDecoder(BaseComponent):
         self,
         in_features: int,
         config: TransformerDecoderConfig,
+        context_dim: int = 0,
     ):
         """Transformer Decoder consisting of multiple TransformerDecoderBlocks.
 
         Args:
             in_features: Input feature dimension.
             config: Configuration for the Transformer Decoder.
+            context_dim: Dimension of the context vector. If 0, no context is used.
         """
         config = config if exists(config) else TransformerDecoderConfig()
         super().__init__()
         self._config = config
+        self._context_dim = context_dim
         self._in_features = in_features
         self._num_layers = config.num_layers
         self._num_registers = config.num_registers
@@ -69,6 +76,7 @@ class TransformerDecoder(BaseComponent):
             TransformerDecoderBlock(
                 in_features=in_features,
                 config=config.transformer_config,
+                context_dim=context_dim,
             )
             for _ in range(config.num_layers)
         ])
@@ -87,12 +95,14 @@ class TransformerDecoder(BaseComponent):
         cu_seqlens_kv: CulensTensor,
         max_seqlen_q: int | None = None,
         max_seqlen_kv: int | None = None,
+        context: BatchedContextTensor | PackedContextTensor | None = None,
     ) -> tuple[PackedTensor, CulensTensor, int | None]:
         """Forward pass through the Transformer block.
 
 
         Args:
-            q_sequence: The primary input sequence tensor of shape (total_tokens, in_features).
+            q_sequence: The primary input sequence tensor of shape (total_tokens,
+                in_features).
             kv_sequence: The conditioning input sequence tensor of shape (
             total_tokens, kv_features).
             cu_seqlens_q: Cumulative sequence lengths for the primary sequence.
@@ -108,6 +118,7 @@ class TransformerDecoder(BaseComponent):
             cu_seqlens_q,
             max_seqlen_q,
         )
+        context = self.maybe_expand_context(context, cu_seqlens_q)
         if not exists(max_seqlen_q):
             max_seqlen_q = cast("int", th.diff(cu_seqlens_q).max().item())
             assert isinstance(max_seqlen_q, int)
@@ -123,6 +134,7 @@ class TransformerDecoder(BaseComponent):
                 cu_seqlens_kv=cu_seqlens_kv,
                 max_seqlen_q=max_seqlen_q,
                 max_seqlen_kv=max_seqlen_kv,
+                context=context,
             )
         return self.maybe_remove_registers(q_sequence, cu_seqlens_q, max_seqlen_q)
 
@@ -183,6 +195,56 @@ class TransformerDecoder(BaseComponent):
             )
         return x, cu_seqlens, maybe_subtract(max_seqlen, self._num_registers)
 
+    @overload
+    def maybe_expand_context(
+        self,
+        context: None,
+        cu_seqlens: CulensTensor,
+    ) -> None: ...
+
+    @overload
+    def maybe_expand_context(
+        self,
+        context: BatchedContextTensor | PackedContextTensor,
+        cu_seqlens: CulensTensor,
+    ) -> jt.Float[th.Tensor, "new_total_length context_dim"]: ...
+
+    def maybe_expand_context(
+        self,
+        context: BatchedContextTensor | PackedContextTensor | None,
+        cu_seqlens: CulensTensor,
+    ) -> jt.Float[th.Tensor, "new_total_length context_dim"] | None:
+        """Expand context to match the packed input if necessary.
+
+        Args:
+            context: Context tensor of shape
+                (batch_size, context_dim) or
+                (total_seq_len, context_dim).
+            cu_seqlens: Cumulative sequence lengths tensor.
+                Shape: (batch_size + 1,).
+
+        Returns:
+            Expanded context tensor of shape
+                (new_total_length, context_dim) or None.
+
+        Raises:
+            ValueError: If context is packed but registers or class tokens are used.
+        """
+        if not exists(context):
+            return None
+
+        if len(context) == len(cu_seqlens) - 1:
+            # Context is batched, expand to packed
+            return th.repeat_interleave(
+                context,
+                th.diff(cu_seqlens),
+                dim=0,
+            )
+
+        if self.has_registers:
+            raise ValueError("Cannot use per-token context when using register.")
+        return context
+
     @property
     def use_flash_attention(self) -> bool:
         """Whether any of the encoder blocks use flash attention."""
@@ -217,3 +279,13 @@ class TransformerDecoder(BaseComponent):
     def out_features(self) -> int:
         """Output feature dimension."""
         return self._in_features
+
+    @property
+    def context_dim(self) -> int:
+        """Dimension of the context vector."""
+        return self._context_dim
+
+    @property
+    def using_context(self) -> bool:
+        """Whether the encoder is using context vectors."""
+        return self._context_dim > 0

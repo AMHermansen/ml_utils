@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
-from typing import cast
+from typing import TypeAlias, cast, overload
 
+import jaxtyping as jt
 import torch as th
 from torch import nn
 from typing_extensions import override
@@ -15,6 +16,9 @@ from ml_utils.torch_utils.types import CulensTensor, PackedTensor
 from ml_utils.utils import exists, maybe_add, maybe_subtract
 
 from .encoder_block import TransformerEncoderBlock, TransformerEncoderBlockConfig
+
+PackedContextTensor: TypeAlias = jt.Float[th.Tensor, " packed_length context_dim"]
+BatchedContextTensor: TypeAlias = jt.Float[th.Tensor, " batch_size context_dim"]
 
 
 @dataclass
@@ -52,13 +56,24 @@ class TransformerEncoder(BaseComponent):
             `TransformerEncoderConfig`, for details.
     """
 
-    def __init__(self, in_features: int, config: TransformerEncoderConfig):
+    def __init__(
+        self,
+        in_features: int,
+        config: TransformerEncoderConfig,
+        context_dim: int = 0,
+    ) -> None:
         """Transformer Encoder consisting of multiple TransformerEncoderBlocks.
+
+        If context and register/class tokens are both used, the context must be batched
+        (i.e., shape (batch_size, context_dim)). If context is per-token
+        (i.e., shape (total_seq_len, context_dim)), then register/class tokens
+        cannot be used.
 
         Args:
             in_features: Input feature dimension.
             config: Configuration for the Transformer Encoder. See
                 `TransformerEncoderConfig`, for details.
+            context_dim: Dimension of the context vector. If 0, no context is used.
         """
         super().__init__()
         config = config if exists(config) else TransformerEncoderConfig()
@@ -68,11 +83,13 @@ class TransformerEncoder(BaseComponent):
         self._num_registers = config.num_registers
         self._num_class_tokens = config.num_class_tokens
         self._transformer_config = config.transformer_config
+        self._context_dim = context_dim
 
         self._layers = nn.ModuleList([
             TransformerEncoderBlock(
                 in_features=self._in_features,
                 config=self._transformer_config,
+                context_dim=context_dim,
             )
             for _ in range(self._num_layers)
         ])
@@ -89,7 +106,12 @@ class TransformerEncoder(BaseComponent):
         )
 
     def forward(
-        self, x: PackedTensor, cu_seqlens: CulensTensor, max_seqlen: int | None = None
+        self,
+        x: PackedTensor,
+        cu_seqlens: CulensTensor,
+        max_seqlen: int | None = None,
+        *,
+        context: BatchedContextTensor | PackedContextTensor | None = None,
     ) -> tuple[PackedTensor, CulensTensor, int | None]:
         """Forward pass through the Transformer Encoder.
 
@@ -98,6 +120,9 @@ class TransformerEncoder(BaseComponent):
             cu_seqlens: Cumulative sequence lengths tensor.
                 Shape: (batch_size + 1,).
             max_seqlen: Optional maximum sequence length.
+            context: Optional context tensor of shape
+                (batch_size, context_dim) or
+                (total_seq_len, context_dim).
 
         Returns:
             tuple containing:
@@ -116,11 +141,17 @@ class TransformerEncoder(BaseComponent):
             cu_seqlens,
             max_seqlen,
         )
+        context = self.maybe_expand_context(context, cu_seqlens)
         if not exists(max_seqlen):
             max_seqlen = cast("int", th.diff(cu_seqlens).max().item())
 
         for layer in self._layers:
-            x = layer(x, cu_seqlens, max_seqlen)
+            x = layer(
+                x=x,
+                cu_seqlens=cu_seqlens,
+                max_seqlen=max_seqlen,
+                context=context,
+            )
 
         return self.maybe_remove_registers(x, cu_seqlens, max_seqlen)
 
@@ -212,6 +243,58 @@ class TransformerEncoder(BaseComponent):
             )
         return x, cu_seqlens, maybe_subtract(max_seqlen, self._num_registers)
 
+    @overload
+    def maybe_expand_context(
+        self,
+        context: None,
+        cu_seqlens: CulensTensor,
+    ) -> None: ...
+
+    @overload
+    def maybe_expand_context(
+        self,
+        context: BatchedContextTensor | PackedContextTensor,
+        cu_seqlens: CulensTensor,
+    ) -> jt.Float[th.Tensor, "new_total_length context_dim"]: ...
+
+    def maybe_expand_context(
+        self,
+        context: BatchedContextTensor | PackedContextTensor | None,
+        cu_seqlens: CulensTensor,
+    ) -> jt.Float[th.Tensor, "new_total_length context_dim"] | None:
+        """Expand context to match the packed input if necessary.
+
+        Args:
+            context: Context tensor of shape
+                (batch_size, context_dim) or
+                (total_seq_len, context_dim).
+            cu_seqlens: Cumulative sequence lengths tensor.
+                Shape: (batch_size + 1,).
+
+        Returns:
+            Expanded context tensor of shape
+                (new_total_length, context_dim) or None.
+
+        Raises:
+            ValueError: If context is packed but registers or class tokens are used.
+        """
+        if not exists(context):
+            return None
+
+        if len(context) == len(cu_seqlens) - 1:
+            # Context is batched, expand to packed
+            return th.repeat_interleave(
+                context,
+                th.diff(cu_seqlens),
+                dim=0,
+            )
+
+        if self.has_registers or self.has_cls_tokens:
+            raise ValueError(
+                "Cannot use per-token context when using register or class tokens."
+            )
+        return context
+
     @property
     def use_flash_attention(self) -> bool:
         """Whether any of the encoder blocks use flash attention."""
@@ -251,3 +334,13 @@ class TransformerEncoder(BaseComponent):
     def out_features(self) -> int:
         """Output feature dimension."""
         return self._in_features
+
+    @property
+    def context_dim(self) -> int:
+        """Dimension of the context vector."""
+        return self._context_dim
+
+    @property
+    def using_context(self) -> bool:
+        """Whether the encoder is using context vectors."""
+        return self._context_dim > 0
