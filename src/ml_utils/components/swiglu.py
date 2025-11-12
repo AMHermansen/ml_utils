@@ -47,7 +47,7 @@ class SwiGLU(nn.Module):
         """
         super().__init__()
         if mode in {"swish", "silu"}:
-            self.inner_factor, self.outer_factor = 1., 1.
+            self.inner_factor, self.outer_factor = 1.0, 1.0
         elif mode == "mp":
             self.inner_factor, self.outer_factor = 1.0, 0.596
             # See https://arxiv.org/pdf/2312.02696 Eq: 80
@@ -61,9 +61,7 @@ class SwiGLU(nn.Module):
         self, tensor: jt.Float[th.Tensor, "... in_features"]
     ) -> jt.Float[th.Tensor, "... (in_features//2)"]:  # noqa: F821
         return swish_gated_linear_unit(
-            tensor,
-            inner_factor=self.inner_factor,
-            outer_factor=self.outer_factor
+            tensor, inner_factor=self.inner_factor, outer_factor=self.outer_factor
         )
 
 
@@ -71,22 +69,27 @@ class SwiGLUMLP(BaseComponent):
     def __init__(
         self,
         in_features: int,
+        upscale_factor: float = 2.0,
         mode: Literal["swish", "mp", "gelu", "silu"] = "swish",
     ):
         """MLP with SwiGLU activation.
 
         Args:
             in_features (int): Number of input features.
+            upscale_factor (float, optional): Factor to upscale the hidden layer.
+                Defaults to 2.0.
             mode: Literal["swish", "mp", "gelu", "silu"]: Mode of SwiGLU activation.
                 If "swish"/"silu", uses standard SwiGLU.
                 If "mp", uses the Magnitude-Preserving SwiGLU variant from EDM2.
                 If "gelu", uses the GeLU approximation using swish.
         """
         super().__init__()
+        hidden_dimension = int(in_features * upscale_factor)
+        self._hidden_dimension = hidden_dimension
         self.net = nn.Sequential(
-            nn.Linear(in_features, in_features * 2),
+            nn.Linear(in_features, 2 * hidden_dimension),
             SwiGLU(mode=mode),
-            nn.Linear(in_features, in_features),
+            nn.Linear(hidden_dimension, in_features),
         )
         self._features = in_features
         self._mode = mode
