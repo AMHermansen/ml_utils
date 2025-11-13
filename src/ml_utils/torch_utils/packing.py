@@ -157,6 +157,7 @@ def unpack_tensor(
         max_length: Maximum length to pad the sequences to. If None, uses the
             maximum sequence length in the batch. Keyword only to avoid confusion with
             unpack_tensors signature.
+
     Returns:
         mask:
             Boolean mask indicating valid entries. Shape (B, N).
@@ -184,7 +185,8 @@ def prepend_tokens_to_packed_tensor(
         tokens: The tokens to prepend. Shape (n_tokens, *feature_dims).
 
     Returns:
-        tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative sequence lengths.
+        tuple[PackedTensor, CulensTensor]: The new packed sequence and updated cumulative
+            sequence lengths.
     """
     assert is_increasing_sequence(cu_seqlens), (
         "cu_seqlens must be an increasing sequence"
@@ -242,3 +244,31 @@ def remove_tokens_from_packed_tensor(
         "cu_seqlens must be an increasing sequence"
     )
     return new_packed_tensor, new_cu_seqlens
+
+
+def get_masked_cu_seqlens(
+    cu_seqlens: CulensTensor,
+    mask: jt.Bool[th.Tensor, " total_seqlen"]
+) -> CulensTensor:
+    """Get cumulative sequence lengths after applying a mask.
+
+    Args:
+        cu_seqlens: The original cumulative sequence lengths. Shape (B+1,).
+        mask: Boolean mask indicating valid entries. Shape (total_seqlen).
+
+    Returns:
+        CulensTensor: The new cumulative sequence lengths after applying the mask.
+    """
+    assert is_increasing_sequence(cu_seqlens), (
+        "cu_seqlens must be an increasing sequence"
+    )
+    cumulative_number_of_masked_elements = th.cat(
+        [
+            th.zeros(1, device=mask.device, dtype=th.int32),
+            th.cumsum(
+                mask.to(dtype=th.int32),
+                dim=0,
+            )
+        ]
+    )
+    return cumulative_number_of_masked_elements[cu_seqlens].to(dtype=th.int32)
