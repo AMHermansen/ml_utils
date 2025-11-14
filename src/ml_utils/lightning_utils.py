@@ -146,16 +146,3 @@ def configure_muon_optimizer(
                 **lightning_config.scheduler_config,
             }
         })
-    return config
-
-
-def foo(x: int) -> int:
-    """Foo.
-
-    Args:
-        x: bar.
-
-    Returns: baz
-
-    """
-    return None
