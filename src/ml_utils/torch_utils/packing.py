@@ -272,3 +272,22 @@ def get_masked_cu_seqlens(
         ]
     )
     return cumulative_number_of_masked_elements[cu_seqlens].to(dtype=th.int32)
+
+
+def get_packed_mean_loss(
+    packed_losses: jt.Float[th.Tensor, " total_len"],
+    cu_seqlens: CulensTensor,
+) -> th.Tensor:
+    """Compute the combined mean loss from packed losses.
+    
+    Args:
+        packed_losses: The packed losses for each valid entry. Shape (total_len,).
+        cu_seqlens: The cumulative sequence lengths. Shape (B+1,).
+    
+    Returns:
+        th.Tensor: The combined mean loss as a scalar tensor.
+    """
+    lengths = th.diff(cu_seqlens)
+    lengths_expanded = th.repeat_interleave(lengths, lengths)
+    weighted_losses = packed_losses / lengths_expanded
+    return th.sum(weighted_losses) / len(lengths)
