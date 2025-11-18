@@ -24,8 +24,13 @@ class ClassAttentionPooling(BaseComponent):
     multiple transformer layers, and extracts a class token as the pooled output.
 
     Args:
-        in_features (int): Dimension of the input features.
-        out_features (int): Dimension of the output features.
+        in_features (int): Dimension of the input features. If not the same as the
+            internal latent dimension, the input will be projected through a linear
+            layer to match the latent dimension.
+        out_features (int): Dimension of the output features. If out_features is not
+            the same as the internal latent dimension, either specified or defaulted,
+            then the output will be projected through a linear layer to match
+            specified out_features.
         latent_dim: Latent feature dimension for internal projections.
                 If None, defaults to in_features.
         context_dim (int): Dimension of the context vector. If 0, no context is used.
