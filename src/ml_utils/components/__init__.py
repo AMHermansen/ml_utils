@@ -3,6 +3,7 @@ from .embedding import CosineEmbedding, FourierEmbedding
 from .mlp import MLP, MLPBlock, MLPBlockConfig, MLPConfig, MLPContextConfig
 from .swiglu import SwiGLU, SwiGLUMLP
 from .transformer import (
+    ClassAttentionPooling,
     TransformerDecoder,
     TransformerDecoderBlock,
     TransformerDecoderBlockConfig,
@@ -16,6 +17,7 @@ from .wrapper import Residual, ResidualConfig, ResidualWithContext
 
 __all__ = [
     "MLP",
+    "ClassAttentionPooling",
     "CosineEmbedding",
     "FourierEmbedding",
     "MLPBlock",
