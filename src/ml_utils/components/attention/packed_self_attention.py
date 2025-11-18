@@ -147,6 +147,8 @@ class PackedSelfAttention(BaseComponent):
             if self._include_qk_norm:
                 assert self._qk_norm is not None
                 q, k = self._qk_norm(q, k)
+                q = q.to(x.dtype)
+                k = k.to(x.dtype)
             qkv = q, k, v
         else:
             qkv = self._convert_to_headed_and_merged_layout(self._qkv_proj(x))
@@ -155,6 +157,8 @@ class PackedSelfAttention(BaseComponent):
                 assert self._qk_norm is not None
                 q, k, v = th.unbind(qkv, dim=1)
                 q, k = self._qk_norm(q, k)
+                q = q.to(x.dtype)
+                k = k.to(x.dtype)
                 qkv = q, k, v
         return qkv  # type: ignore
 
