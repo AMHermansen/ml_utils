@@ -109,3 +109,8 @@ def maybe_multiply(a: Any, b: Any) -> Any:
     if exists(a) and exists(b):
         return a * b
     return None
+
+
+def identity(x: T) -> T:
+    """Return the input value unchanged."""
+    return x
