@@ -58,7 +58,7 @@ class LightningConfig:
 
 def configure_optimizer_standard(
     model: LightningModule, lightning_config: LightningConfig
-) -> "OptimizerLRScheduler":
+) -> "OptimizerLRSchedulerConfig":
     optimizer = lightning_config.optimizer_class(
         filter(lambda p: p.requires_grad, model.parameters()),
         **lightning_config.optimizer_kwargs,
@@ -70,8 +70,8 @@ def configure_optimizer_standard(
         scheduler = lightning_config.scheduler_class(
             optimizer, **lightning_config.scheduler_kwargs
         )
-        config.update({
-            "lr_scheduler": {
+        config.update({  # type: ignore
+            "lr_scheduler": {  # type: ignore
                 "scheduler": scheduler,
                 **lightning_config.scheduler_config,
             }
@@ -140,8 +140,8 @@ def configure_muon_optimizer(
             optimizer,
             **lightning_config.scheduler_kwargs
         )
-        config.update({
-            "lr_scheduler": {
+        config.update({  # type: ignore
+            "lr_scheduler": {  # type: ignore
                 "scheduler": scheduler,
                 **lightning_config.scheduler_config,
             }
