@@ -1,7 +1,9 @@
+from itertools import pairwise
+from random import shuffle
 from typing import Any
 
 import torch as th
-from torch.utils.data import default_collate
+from torch.utils.data import default_collate, Sampler
 
 
 def check_variable_in_list_of_batches(
@@ -90,3 +92,81 @@ class CumulativeSeqlengthCollator:
             **non_seq_len_vars,
             **cumulative_seqlengths,
         }
+
+
+class SequenceBucketingSampler(Sampler):
+    def __init__(
+        self,
+        lengths: th.Tensor,
+        batch_size: int,
+        length_splits: list[int],
+        drop_exceeding: bool = False,
+        shuffle: bool = False,
+    ):
+        self._lengths = lengths
+        self._batch_size = batch_size
+        self._length_splits = length_splits
+        self._shuffle = shuffle
+        self._drop_exceeding = drop_exceeding
+
+        self._create_buckets()
+
+    def _create_buckets(self):
+        indices = th.arange(len(self._lengths))
+        first_bucket = indices[self._lengths < self._length_splits[0]]
+        buckets = [first_bucket]
+        for lower_bound, upper_bound in pairwise(self._length_splits):
+            bucket_indices = indices[
+                (self._lengths >= lower_bound) & (self._lengths < upper_bound)
+            ]
+            buckets.append(bucket_indices)
+        buckets.append(indices[self._lengths >= self._length_splits[-1]])
+        self._buckets = buckets
+
+    def shuffle_buckets(self, buckets: list[th.Tensor]) -> list[th.Tensor]:
+        """Shuffle indices within each bucket and the bucket order if enabled."""
+        if not self._shuffle:
+            return buckets
+
+        shuffled_buckets: list[th.Tensor] = []
+        for b in buckets:
+            if len(b) == 0:
+                shuffled_buckets.append(b)
+                continue
+            perm = th.randperm(len(b))
+            shuffled_buckets.append(b[perm])
+
+        if len(shuffled_buckets) > 1:
+            order = th.randperm(len(shuffled_buckets)).tolist()
+            shuffled_buckets = [shuffled_buckets[i] for i in order]
+
+        return shuffled_buckets
+
+    def batchify_buckets(self, buckets: list[th.Tensor]) -> list[list[th.Tensor]]:
+        """Split each bucket into a list of batch tensors (per-bucket)."""
+        per_bucket_batches: list[list[th.Tensor]] = []
+        for b in buckets:
+            n = len(b)
+            bucket_batches: list[th.Tensor] = []
+            for i in range(0, n, self._batch_size):
+                chunk = b[i : i + self._batch_size]
+                if len(chunk) < self._batch_size and self._drop_exceeding:
+                    continue
+                bucket_batches.append(chunk)
+            per_bucket_batches.append(bucket_batches)
+        return per_bucket_batches
+
+    def flatten_buckets(self, batched_buckets: list[list[th.Tensor]]) -> list[th.Tensor]:
+        """Flatten the per-bucket lists of batches into a single list of batches."""
+        return [batch for bucket in batched_buckets for batch in bucket]
+
+    def __iter__(self):
+        # work on copies to avoid mutating internal state
+        buckets_copy = [b.clone() for b in self._buckets]
+        shuffled = self.shuffle_buckets(buckets_copy)
+        per_bucket = self.batchify_buckets(shuffled)
+        flat_batches = self.flatten_buckets(per_bucket)
+        shuffle(flat_batches)
+
+        for batch in flat_batches:
+            yield batch.tolist()
