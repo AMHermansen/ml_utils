@@ -1,5 +1,5 @@
 from itertools import pairwise
-from random import shuffle
+import random
 from typing import Any
 
 import torch as th
@@ -166,7 +166,17 @@ class SequenceBucketingSampler(Sampler):
         shuffled = self.shuffle_buckets(buckets_copy)
         per_bucket = self.batchify_buckets(shuffled)
         flat_batches = self.flatten_buckets(per_bucket)
-        shuffle(flat_batches)
+        random.shuffle(flat_batches)
 
         for batch in flat_batches:
             yield batch.tolist()
+
+    def __len__(self):
+        total_batches = 0
+        for bucket in self._buckets:
+            n = len(bucket)
+            if self._drop_exceeding:
+                total_batches += n // self._batch_size
+            else:
+                total_batches += (n + self._batch_size - 1) // self._batch_size
+        return total_batches
