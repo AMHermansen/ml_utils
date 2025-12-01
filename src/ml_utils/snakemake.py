@@ -201,16 +201,14 @@ def add_wandb_logger_command(
         A command string to be used in a Snakemake workflow for adding the
         WandbLogger.
     """
-    tags_str = ", ".join(
-        f'"{tag}"' for tag in tags
-    ) if tags is not None else ""
-    tags_command = f"'[{tags_str}]'" if tags_str else ""
+    tags_command_prefix = "--trainer.logger.init_args.tags"
+    tags_command = " ".join([f"{tags_command_prefix}+='{tag}'" for tag in tags] if tags else "")
     return " ".join(
         [
             f"--trainer.logger.class_path=lightning.pytorch.loggers.WandbLogger",
             f"--trainer.logger.init_args.project={project}",
             f"--trainer.logger.init_args.name={name}",
             f"--trainer.logger.init_args.save_dir={save_dir}",
-            f"--trainer.logger.init_args.tags={tags_command}",
+            f"{tags_command}",
         ] + process_additional_params("trainer.logger.init_args", **kwargs)
     )
