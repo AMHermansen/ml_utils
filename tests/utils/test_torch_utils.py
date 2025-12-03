@@ -4,6 +4,9 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from ml_utils.torch_utils.misc import recurse_and_apply
+from ml_utils.torch_utils.sinkhorn_knopp import sinkhorn_knopp
+
+import torch as th
 
 
 class TestRecurseAndApply(unittest.TestCase):
@@ -195,6 +198,34 @@ class TestRecurseAndApply(unittest.TestCase):
         result = recurse_and_apply(value, double, int)
         assert result == value * 2
 
+class TestSinkhornKnopp(unittest.TestCase):
+    @given(
+        seq_len=st.integers(min_value=2, max_value=10),
+        batch_size=st.integers(min_value=1, max_value=5),
+        feature_size=st.integers(min_value=1, max_value=10),
+    )
+    def test_sinkhorn_knopp(self, seq_len: int, batch_size: int, feature_size: int):
+        """Test Sinkhorn-Knopp algorithm on random positive matrices."""
+        input_matrix = th.exp(th.randn(batch_size, seq_len, seq_len, feature_size))
+        if batch_size == 1:
+            input_matrix = input_matrix.squeeze(0)
+        if feature_size == 1:
+            input_matrix = input_matrix.squeeze(-1)
 
-if __name__ == "__main__":
-    unittest.main()
+        dim1 = 1 if batch_size > 1 else 0
+        dim2 = 2 if batch_size > 1 else 1
+
+        result = sinkhorn_knopp(
+            input_matrix,
+            num_iters=3,
+            dim1=dim1,
+            dim2=dim2,
+        )
+
+        # Check that rows sum to 1
+        row_sums = result.sum(dim=dim1)
+        th.allclose(row_sums, th.ones_like(row_sums), atol=1e-2)
+
+        # Check that columns sum to 1
+        col_sums = result.sum(dim=dim2)
+        th.allclose(col_sums, th.ones_like(col_sums), atol=1e-2)
