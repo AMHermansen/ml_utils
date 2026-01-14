@@ -35,6 +35,24 @@ def swish_gated_linear_unit(
     return x * silu(inner_factor * gate) / outer_factor
 
 
+def gated_linear_unit(
+    tensor: jt.Float[th.Tensor, "... in_features"],
+):
+    """GLU activation function.
+
+    Applies the GLU activation function to the input tensor.
+    The input tensor is split into two halves along the last dimension.
+
+    Args:
+        tensor (jt.Float[th.Tensor, "... in_features"]): Input tensor of shape (..., in_features)
+
+    Returns:
+        jt.Float[th.Tensor, "... in_features // 2"]: Output tensor of shape (..., in_features // 2)
+    """
+    x, gate = tensor.chunk(2, dim=-1)
+    return x * th.sigmoid(gate)
+
+
 class SwiGLU(nn.Module):
     def __init__(self, mode: Literal["swish", "mp", "gelu", "silu"] = "swish"):
         """SwiGLU activation.
