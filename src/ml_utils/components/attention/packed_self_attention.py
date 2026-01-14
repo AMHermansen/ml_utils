@@ -14,7 +14,7 @@ from ml_utils.torch_utils.types import (
     PackedQKVTensor,
     PackedTensor,
 )
-from ml_utils.utils import exists
+from ml_utils.utils import default, exists
 
 from . import FlashAttentionKWArgs
 from ._backends import (
@@ -54,7 +54,7 @@ class PackedSelfAttention(BaseComponent):
         Raises:
             ValueError: If dimension is not divisible by nheads.
         """
-        config = config if exists(config) else SelfAttentionConfig()
+        config = default(config, SelfAttentionConfig())
         assert isinstance(config, SelfAttentionConfig)
         super().__init__()
         if in_features % config.nheads != 0:
@@ -123,7 +123,9 @@ class PackedSelfAttention(BaseComponent):
         Returns:
             Packed output tensor of shape (packed_length, dimension)
         """
-        assert is_increasing_sequence(cu_seqlens), "cu_seqlens must be an increasing sequence"
+        assert is_increasing_sequence(cu_seqlens), (
+            "cu_seqlens must be an increasing sequence"
+        )
         flash_attention_kwargs = (
             self._train_flash_attention_kwargs
             if self.training
@@ -179,9 +181,7 @@ class PackedSelfAttention(BaseComponent):
             factor: Scaling factor for initialization standard deviations.
         """
         init_qkv_std = (
-            init_qkv_std
-            if init_qkv_std is not None
-            else self.in_features**-0.5
+            init_qkv_std if init_qkv_std is not None else self.in_features**-0.5
         )
         proj_std = (
             init_proj_std
