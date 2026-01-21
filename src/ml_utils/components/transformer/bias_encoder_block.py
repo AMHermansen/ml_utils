@@ -45,6 +45,8 @@ class BiasTransformerEncoderBlock(BaseComponent):
         config: BiasTransformerEncoderBlockConfig,
     ):
         super().__init__()
+        self._in_features = in_features
+        self._bias_features = bias_features
         self._config = config
         residual_wrapper = (
             partial(
@@ -72,7 +74,7 @@ class BiasTransformerEncoderBlock(BaseComponent):
         x: BatchSequenceTensor,
         bias: BatchedMatrixTensor,
         mask: th.Tensor | None = None,
-    ):
+    ) -> BatchSequenceTensor:
         """Forward pass of the encoder block.
 
         Args:
@@ -86,3 +88,15 @@ class BiasTransformerEncoderBlock(BaseComponent):
         x = self._attention(x, bias, mask=mask)
         x = self._feed_forward(x)
         return x
+
+    @property
+    def in_features(self) -> int:
+        return self._in_features
+
+    @property
+    def out_features(self) -> int:
+        return self._in_features
+    
+    @property
+    def in_bias_features(self) -> int:
+        return self._bias_features
