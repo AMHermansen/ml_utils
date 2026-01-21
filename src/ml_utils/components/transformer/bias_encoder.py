@@ -50,6 +50,14 @@ class BiasTransformerEncoder(BaseComponent):
             for _ in range(config.num_layers)
         ])
 
+    @property
+    def out_features(self) -> int:
+        return self._in_features
+
+    @property
+    def in_features(self) -> int | None:
+        return self._in_features
+
     def forward(self, x: BatchSequenceTensor, bias: BatchedMatrixTensor,
     mask: th.Tensor | None = None,
     ) -> BatchSequenceTensor:
