@@ -10,7 +10,7 @@ GeneralPackedTensor: TypeAlias = jt.Float[th.Tensor, " total_valid_entries *feat
 GeneralUnpackedTensor: TypeAlias = jt.Float[th.Tensor, " batch_size max_length *features"]
 
 PackedTensor: TypeAlias = jt.Float[th.Tensor, " packed_length features"]
-BatchedTensor: TypeAlias = jt.Float[th.Tensor, " batch_size length features"]
+BatchSequenceTensor: TypeAlias = jt.Float[th.Tensor, " batch_size length features"]
 BatchedMatrixTensor: TypeAlias = jt.Float[th.Tensor, " batch_size length length dim"]
 
 CulensTensor: TypeAlias = jt.Int[th.Tensor, " batch_size+1"]

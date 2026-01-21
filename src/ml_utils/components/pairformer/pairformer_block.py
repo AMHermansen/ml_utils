@@ -4,8 +4,8 @@ import torch as nn
 import torch as th
 from torch import nn
 
-from ml_utils.components.attention.self_attention_bias import PackedSelfAttentionBias
-from ml_utils.components.mlp import MLPBlock
+from ml_utils.components.attention.self_attention_bias import SelfAttentionBias
+from ml_utils.components.mlp import MLP
 from ml_utils.torch_utils.types import BatchedMatrixTensor
 from ml_utils.utils import default, exists
 
@@ -89,7 +89,7 @@ class PairFormerBlock(nn.Module):
             direction="ending",
             config=config.triangle_attention_config,
         )
-        self.pair_mlp = MLPBlock(
+        self.pair_mlp = MLP(
             in_features=pair_features,
             out_features=pair_features,
             config=config.pair_mlp_config,
@@ -111,12 +111,12 @@ class PairFormerBlock(nn.Module):
             axis="column",
         )
 
-        self.single_attention = PackedSelfAttentionBias(
+        self.single_attention = SelfAttentionBias(
             in_features=single_features,
             bias_features=pair_features,
             config=config.single_attention_config,
         )
-        self.single_mlp = MLPBlock(
+        self.single_mlp = MLP(
             in_features=single_features,
             out_features=single_features,
             config=config.single_mlp_config,
@@ -129,17 +129,22 @@ class PairFormerBlock(nn.Module):
         single_features: th.Tensor,
         pair_features: BatchedMatrixTensor,
         seq_lens: th.Tensor,
+        mask: th.Tensor,
     ) -> tuple[th.Tensor, th.Tensor]:
         """Forward pass of the PairFormer module.
 
         Args:
-            single_features: Single representations. Jagged tensor.
+            single_features: Single representations. Shape (batch_size,
             pair_features: Bias tensor of shape (batch_size, seq_len, seq_len, pair_features).
             seq_lens: Sequence lengths for each batch element. Shape (batch_size,).
+            mask: Attention mask. Shape (batch_size, seq_len).
 
         Returns:
             Updated single and pair representations.
         """
+        # Even though seq_lens and mask contain the same information, we require both
+        # because some modules use seq_lens, while others use mask...
+        # The interface is cleaned up in the PairFormer module.
         pair_features = pair_features + self.dropout_row1(
             self.triangle_multiplication_outgoing(pair_features, seq_lens)
         )
@@ -157,6 +162,7 @@ class PairFormerBlock(nn.Module):
         single_features = single_features + self.single_attention(
             single_features,
             bias=pair_features,
+            mask=mask,
         )
         single_features = single_features + self.single_mlp(single_features)
         return single_features, pair_features

@@ -51,8 +51,7 @@ class TriangleMultiplication(BaseComponent):
         self._direction = direction
         self._norm = instantiate_norm_layer(config.norm_type, in_features)
 
-        self._a_proj = nn.Linear(in_features, 2 * in_features, bias=config.use_bias)
-        self._b_proj = nn.Linear(in_features, 2 * in_features, bias=config.use_bias)
+        self._ab_proj = nn.Linear(in_features, 4 * in_features, bias=config.use_bias)
         self._gate_proj = nn.Sequential(
             nn.Sigmoid(), nn.Linear(in_features, in_features)
         )
@@ -80,8 +79,9 @@ class TriangleMultiplication(BaseComponent):
             BatchedMatrixTensor: Output tensor of shape (batch_size, N, N, in_features).
         """
         x = self._norm(x)
-        a = gated_linear_unit(self._a_proj(x))
-        b = gated_linear_unit(self._b_proj(x))
+        a, b = self._ab_proj(x).chunk(2, dim=-1)
+        a = gated_linear_unit(a)
+        b = gated_linear_unit(b)
         gate = self._gate_proj(x)
 
         mask = self.create_mask(seq_lens, x)
