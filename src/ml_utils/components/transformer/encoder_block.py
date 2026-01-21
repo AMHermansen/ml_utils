@@ -75,7 +75,6 @@ class TransformerEncoderBlock(BaseComponent):
             context_dim: Dimension of the context vector for conditioning.
         """
         super().__init__()
-        config = config if exists(config) else TransformerEncoderBlockConfig()
         self._config = config
         self._context_dim = context_dim
         residual_wrapper = (
