@@ -13,6 +13,7 @@ import torch as th
 from torch import nn
 
 from ml_utils.torch_utils.types import CulensTensor
+from ml_utils.utils import default
 
 
 # Implementation based on https://github.com/mattcleigh/mltools/blob/master/mltools/torch_utils.py
@@ -97,12 +98,24 @@ def recurse_and_apply(
 def convert_to_torch(
     data_collection: Any,
     device: th.device | str = "cpu",
+    dtype: th.dtype | None = None,
 ):
-    """Converts all numpy arrays in a nested collection to PyTorch tensors."""
+    """Converts all numpy arrays in a nested collection to PyTorch tensors.
+    
+    Args:
+        data_collection: Any: A nested collection (list, tuple, dict) containing numpy arrays or PyTorch tensors.
+        device: th.device | str: The device to move the tensors to.
+        dtype: th.dtype | None: The desired data type of the tensors. 
+            If None the data type is converted to float32.
 
+    Returns:
+
+    """
+    dtype = default(dtype, th.float32)
     def to_torch(x: np.ndarray | th.Tensor) -> th.Tensor:
         if isinstance(x, th.Tensor):
-            return x.to(device=device)
+            x = x.to(device=device)
+            return x.to(dtype=dtype)
         return th.tensor(x, device=device)
 
     return recurse_and_apply(data_collection, to_torch, (np.ndarray, th.Tensor))
