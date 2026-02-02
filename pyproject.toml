@@ -13,6 +13,7 @@ dependencies = [
     "torch>=2.8.0",
     "h5py>=3.15.1",
     "einops>=0.8.1",
+    "einx>=0.3.0",
 ]
 
 [project.optional-dependencies]
