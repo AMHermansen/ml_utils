@@ -26,7 +26,7 @@ class PairFormer(nn.Module):
                 pair_features=pair_features,
                 config=config.block_config,
             )
-            for _ in range(config.num_blocks)
+            for _ in range(config.num_layers)
         ])
 
     def forward(

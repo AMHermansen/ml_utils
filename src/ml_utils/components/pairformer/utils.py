@@ -64,9 +64,9 @@ class PairFormerConfig:
     """Configuration for the PairFormer model.
 
     Attributes:
-        num_blocks: Number of PairFormer blocks to stack.
+        num_layers: Number of PairFormer blocks to stack.
         block_config: Configuration for each PairFormer block.
     """
 
-    num_blocks: int = 4
+    num_layers: int = 4
     block_config: PairFormerBlockConfig = field(default_factory=PairFormerBlockConfig)
