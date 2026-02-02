@@ -58,8 +58,11 @@ class BiasTransformerEncoder(BaseComponent):
     def in_features(self) -> int | None:
         return self._in_features
 
-    def forward(self, x: BatchSequenceTensor, bias: BatchedMatrixTensor,
-    mask: th.Tensor | None = None,
+    def forward(
+        self,
+        x: BatchSequenceTensor,
+        bias: BatchedMatrixTensor,
+        mask: th.Tensor | None = None,
     ) -> BatchSequenceTensor:
         """Forward pass through the Bias Transformer Encoder.
 
