@@ -8,6 +8,7 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from lightning.pytorch import Trainer, LightningModule
+    import lightning.pytorch as pl
 
 
 class SnakemakeConfirmFinish(Callback):
