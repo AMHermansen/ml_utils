@@ -4,12 +4,12 @@ from typing import TypeAlias
 
 import einx
 import torch as th
+from einops.layers.torch import Rearrange
 from torch import nn
 from torch.nn.attention.flex_attention import (
     flex_attention,
 )
 from typing_extensions import override
-from einops.layers.torch import Rearrange
 
 from ml_utils.components.base import BaseComponent
 from ml_utils.components.utils import instantiate_norm_layer
@@ -29,6 +29,7 @@ ScoreModSignature: TypeAlias = Callable[
 MaskFuncSignature: TypeAlias = Callable[
     [th.Tensor, th.Tensor, th.Tensor, th.Tensor], th.Tensor
 ]
+
 
 # From a quick benchmark, flex_attention seems to be quite slower than math based
 class PackedSelfAttentionBias(BaseComponent):

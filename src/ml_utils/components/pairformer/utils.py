@@ -41,7 +41,20 @@ class TriangleAttentionConfig:
 
 @dataclass
 class PairFormerBlockConfig:
-    """Configuration for a single PairFormer block."""
+    """Configuration for a single PairFormer block.
+    
+    Args:
+        triangle_multiplication_config: Configuration for the triangle multiplication operation.
+        triangle_attention_config: Configuration for the triangle attention operation.
+        single_attention_config: Configuration for the single attention operation.
+        pair_mlp_config: Configuration for the MLP applied to pair features.
+        single_mlp_config: Configuration for the MLP applied to single features.
+        dropout_probability: Dropout probability to apply after each operation.
+        use_pre_mlp_norm: Whether to apply RMS Norm before the MLPs.
+        compile_modules: This is the preferred way to compile the pairformer block.
+            The reason directly compiling the block is not recommended is due to a bug in
+            the bias attention module which causes run-time errors when compiled.
+    """
 
     triangle_multiplication_config: TriangleMultiplicationConfig = field(
         default_factory=TriangleMultiplicationConfig
@@ -56,6 +69,7 @@ class PairFormerBlockConfig:
     single_mlp_config: MLPConfig = field(default_factory=MLPConfig)
 
     dropout_probability: float = 0.25
+    use_pre_mlp_norm: bool = False
     compile_modules: bool = False
 
 

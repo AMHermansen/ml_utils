@@ -121,6 +121,10 @@ class PairFormerBlock(nn.Module):
             out_features=single_features,
             config=config.single_mlp_config,
         )
+        if self._config.use_pre_mlp_norm:
+            self._pre_mlp_norm = nn.RMSNorm(single_features)
+        else:
+            self._pre_mlp_norm = nn.Identity()
         if self._config.compile_modules:
             self._compile_modules()
 
@@ -168,6 +172,8 @@ class PairFormerBlock(nn.Module):
         return single_features, pair_features
 
     def _compile_modules(self):
+        # Increase cache limit test.
+        th._dynamo.config.cache_size_limit = 1000
         self.triangle_multiplication_outgoing = th.compile(
             self.triangle_multiplication_outgoing,
             dynamic=True,
