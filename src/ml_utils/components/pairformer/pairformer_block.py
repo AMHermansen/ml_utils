@@ -4,8 +4,8 @@ import torch as nn
 import torch as th
 from torch import nn
 
-from ml_utils.components.attention.self_attention_bias import PackedSelfAttentionBias
-from ml_utils.components.mlp import MLPBlock
+from ml_utils.components.attention.self_attention_bias import SelfAttentionBias
+from ml_utils.components.mlp import MLP
 from ml_utils.torch_utils.types import BatchedMatrixTensor
 from ml_utils.utils import default, exists
 
@@ -15,6 +15,14 @@ from .utils import PairFormerBlockConfig
 
 
 class Dropout(nn.Module):
+    """Row and column dropout module for the PairFormer architecture.
+    
+    Args:
+        probability: Dropout probability.
+        axis: Axis along which to apply dropout. "row" or "column". If None, reverts to
+            standard dropout.
+    
+    """
     def __init__(
         self,
         probability: float = 0.25,
@@ -57,12 +65,26 @@ class Dropout(nn.Module):
 
 
 class PairFormerBlock(nn.Module):
+    """Implements a single block of the PairFormer architecture.
+    
+    Args:
+        single_features: Number of features in the single representations.
+        pair_features: Number of features in the pair representations.
+        config: Configuration for the PairFormer block. If None, default configuration is used.
+    """
     def __init__(
         self,
         single_features: int,
         pair_features: int,
         config: PairFormerBlockConfig | None = None,
     ):
+        """Initializes the PairFormer block.
+        
+        Args:
+            single_features: Number of features in the single representations.
+            pair_features: Number of features in the pair representations.
+            config: Configuration for the PairFormer block. If None, default configuration is used.
+        """
         config = default(config, PairFormerBlockConfig())
         super().__init__()
         self._single_features = single_features
@@ -89,7 +111,7 @@ class PairFormerBlock(nn.Module):
             direction="ending",
             config=config.triangle_attention_config,
         )
-        self.pair_mlp = MLPBlock(
+        self.pair_mlp = MLP(
             in_features=pair_features,
             out_features=pair_features,
             config=config.pair_mlp_config,
@@ -111,16 +133,20 @@ class PairFormerBlock(nn.Module):
             axis="column",
         )
 
-        self.single_attention = PackedSelfAttentionBias(
+        self.single_attention = SelfAttentionBias(
             in_features=single_features,
             bias_features=pair_features,
             config=config.single_attention_config,
         )
-        self.single_mlp = MLPBlock(
+        self.single_mlp = MLP(
             in_features=single_features,
             out_features=single_features,
             config=config.single_mlp_config,
         )
+        if self._config.use_pre_mlp_norm:
+            self._pre_mlp_norm = nn.RMSNorm(single_features)
+        else:
+            self._pre_mlp_norm = nn.Identity()
         if self._config.compile_modules:
             self._compile_modules()
 
@@ -129,17 +155,22 @@ class PairFormerBlock(nn.Module):
         single_features: th.Tensor,
         pair_features: BatchedMatrixTensor,
         seq_lens: th.Tensor,
+        mask: th.Tensor,
     ) -> tuple[th.Tensor, th.Tensor]:
         """Forward pass of the PairFormer module.
 
         Args:
-            single_features: Single representations. Jagged tensor.
+            single_features: Single representations. Shape (batch_size,
             pair_features: Bias tensor of shape (batch_size, seq_len, seq_len, pair_features).
             seq_lens: Sequence lengths for each batch element. Shape (batch_size,).
+            mask: Attention mask. Shape (batch_size, seq_len).
 
         Returns:
             Updated single and pair representations.
         """
+        # Even though seq_lens and mask contain the same information, we require both
+        # because some modules use seq_lens, while others use mask...
+        # The interface is cleaned up in the PairFormer module.
         pair_features = pair_features + self.dropout_row1(
             self.triangle_multiplication_outgoing(pair_features, seq_lens)
         )
@@ -157,11 +188,14 @@ class PairFormerBlock(nn.Module):
         single_features = single_features + self.single_attention(
             single_features,
             bias=pair_features,
+            mask=mask,
         )
         single_features = single_features + self.single_mlp(single_features)
         return single_features, pair_features
 
     def _compile_modules(self):
+        # Increase cache limit test.
+        th._dynamo.config.cache_size_limit = 1000
         self.triangle_multiplication_outgoing = th.compile(
             self.triangle_multiplication_outgoing,
             dynamic=True,

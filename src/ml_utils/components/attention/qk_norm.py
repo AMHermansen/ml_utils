@@ -21,7 +21,7 @@ class QKNorm(nn.Module):
             self.k_norm = nn.LayerNorm(dim)
         elif norm_type == "rms":
             self.q_norm = nn.RMSNorm(dim)
-            self.k_norm = nn.LayerNorm(dim)
+            self.k_norm = nn.RMSNorm(dim)
         else:
             raise ValueError(f"Unsupported normalization type: {norm_type}")
 
@@ -41,6 +41,9 @@ class QKNorm(nn.Module):
         Returns:
             A tuple containing the normalized query and key tensors.
         """
+        # Seems like LayerNorm can convert dtypes to float32, and flash attention requires half-precision.
+        query_dtype = query.dtype
+        key_dtype = key.dtype
         normed_query = self.q_norm(query)
         normed_key = self.k_norm(key)
-        return normed_query, normed_key
+        return normed_query.to(query_dtype), normed_key.to(key_dtype)

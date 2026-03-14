@@ -8,6 +8,7 @@ from typing_extensions import override
 
 if TYPE_CHECKING:
     from lightning.pytorch import Trainer, LightningModule
+    import lightning.pytorch as pl
 
 
 class SnakemakeConfirmFinish(Callback):
@@ -211,4 +212,23 @@ def add_wandb_logger_command(
             f"--trainer.logger.init_args.save_dir={save_dir}",
             f"{tags_command}",
         ] + process_additional_params("trainer.logger.init_args", **kwargs)
+    )
+
+
+def add_csv_logger_command(save_dir: Path) -> str:
+    """Generates a command string to add a CSVLogger to a Snakemake workflow.
+
+    Args:
+        save_dir: The directory where logs will be saved.
+
+    Returns:
+        A command string to be used in a Snakemake workflow for adding the
+        CSVLogger.
+    """
+    return " ".join(
+        [
+            f"--trainer.logger.class_path=lightning.pytorch.loggers.CSVLogger",
+            f"--trainer.logger.init_args.save_dir={save_dir}",
+            f"--trainer.logger.init_args.name=csv_logs",
+        ]
     )

@@ -289,5 +289,5 @@ def get_packed_mean_loss(
     """
     lengths = th.diff(cu_seqlens)
     lengths_expanded = th.repeat_interleave(lengths, lengths)
-    weighted_losses = packed_losses / lengths_expanded
+    weighted_losses = th.einsum("n...,n->n...", packed_losses, 1.0 / lengths_expanded)
     return th.sum(weighted_losses) / len(lengths)
