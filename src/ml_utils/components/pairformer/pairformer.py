@@ -51,7 +51,9 @@ class PairFormer(nn.Module):
                 If None, mask will be inferred from seq_lens.
 
         Returns:
-            Updated single and pair representations.
+            Tuple of (single_features, pair_features) after processing through the blocks.
+                single_features: Shape (batch_size, seq_len, single_features)
+                pair_features: Shape (batch_size, seq_len, seq_len, pair_features)
 
         Raises:
             ValueError: If both seq_lens and mask are None.

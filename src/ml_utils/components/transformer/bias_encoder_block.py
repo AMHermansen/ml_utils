@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Literal
+from typing_extensions import override
 
 import torch as th
 
@@ -35,6 +36,8 @@ class BiasTransformerEncoderBlock(BaseComponent):
     both wrapped in residual connections.
 
     Args:
+        in_features: The number of input features for the encoder block.
+        bias_features: The number of features in the bias tensor.
         config: Configuration for the encoder block.
     """
 
@@ -48,20 +51,20 @@ class BiasTransformerEncoderBlock(BaseComponent):
         self._in_features = in_features
         self._bias_features = bias_features
         self._config = config
-        residual_wrapper = (
+        ResidualWrapper = (
             partial(
                 Residual,
                 config=self._config.residual_config
             )
         )
-        self._attention = residual_wrapper(
+        self._attention = ResidualWrapper(
             SelfAttentionBias(
                 in_features=in_features,
                 bias_features=bias_features,
                 config=self._config.attention_config,
             )
         )
-        self._feed_forward = residual_wrapper(
+        self._feed_forward = ResidualWrapper(
             SwiGLUMLP(
                 in_features=in_features,
                 mode=self._config.swiglu_mode,
@@ -90,10 +93,12 @@ class BiasTransformerEncoderBlock(BaseComponent):
         return x
 
     @property
+    @override
     def in_features(self) -> int:
         return self._in_features
 
     @property
+    @override
     def out_features(self) -> int:
         return self._in_features
     
