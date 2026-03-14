@@ -94,8 +94,8 @@ def transform_qkv_to_bfloat16(
     """
     if isinstance(qkv, tuple):
         return cast(
-            "tuple[PackedMHATensor, PackedMHATensor, PackedMHATensor]", 
-            tuple(t.to(th.bfloat16) for t in qkv)
+            "tuple[PackedMHATensor, PackedMHATensor, PackedMHATensor]",
+            tuple(t.to(th.bfloat16) for t in qkv),
         )
     if isinstance(qkv, th.Tensor):
         return qkv.to(th.bfloat16)

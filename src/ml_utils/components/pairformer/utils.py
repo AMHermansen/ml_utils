@@ -11,7 +11,7 @@ class TriangleMultiplicationConfig:
 
     Attributes:
         norm_type: Type of normalization to use. Options are "layer", "rms", or None.
-            Using no normalization is not recommended, and can lead to training 
+            Using no normalization is not recommended, and can lead to training
             instability.
         use_bias: Whether to include a bias term in the multiplication.
     """
@@ -26,7 +26,7 @@ class TriangleAttentionConfig:
 
     Attributes:
         norm_type: Type of normalization to use. Options are "layer", "rms", or None.
-            Using no normalization is not recommended, and can lead to training 
+            Using no normalization is not recommended, and can lead to training
             instability.
         use_bias: Whether to include a bias term in the attention mechanism.
         num_heads: Number of attention heads to use.
@@ -42,7 +42,7 @@ class TriangleAttentionConfig:
 @dataclass
 class PairFormerBlockConfig:
     """Configuration for a single PairFormer block.
-    
+
     Args:
         triangle_multiplication_config: Configuration for the triangle multiplication operation.
         triangle_attention_config: Configuration for the triangle attention operation.

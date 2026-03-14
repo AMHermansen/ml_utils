@@ -212,9 +212,7 @@ class SelfAttentionBias(BaseComponent):
         self._to_headed_layout = Rearrange(
             "b s (h d) -> b h s d", h=self._config.nheads
         )
-        self._from_headed_layout = Rearrange(
-            "b h s d -> b s (h d)"
-        )
+        self._from_headed_layout = Rearrange("b h s d -> b s (h d)")
         self._to_headed_bias_layout = Rearrange("b s1 s2 h -> b h s1 s2")
 
         self._compute_scores = partial(th.einsum, "b h i d, b h j d -> b h i j")
@@ -263,7 +261,9 @@ class SelfAttentionBias(BaseComponent):
         if exists(mask):
             attn_scores = einx.where(
                 "b j, b h i j, -> b h i j",
-                mask, attn_scores, - th.finfo(attn_scores.dtype).max
+                mask,
+                attn_scores,
+                -th.finfo(attn_scores.dtype).max,
             )
         attn_weights = th.softmax(attn_scores, dim=-1)
         attn_output_headed = self._compute_out(attn_weights, v)

@@ -22,6 +22,7 @@ class MLPBlockConfig:
         do_residual: Whether to include a residual connection.
         no_bias: Whether to disable bias in the linear layer.
     """
+
     activation: str | nn.Module = "SiLU"
     norm: str | nn.Module | None = None
     dropout: float = 0.0
@@ -39,6 +40,7 @@ class MLPContextConfig:
         apply_on_hidden: Whether to apply context on hidden layers.
         apply_on_output: Whether to apply context on output layer.
     """
+
     context_features: int = 0
     apply_on_input: bool = True
     apply_on_hidden: bool = False
@@ -46,9 +48,7 @@ class MLPContextConfig:
 
     def __post_init__(self):
         if self.context_features and not (
-            self.apply_on_input
-            or self.apply_on_hidden
-            or self.apply_on_output
+            self.apply_on_input or self.apply_on_hidden or self.apply_on_output
         ):
             raise ValueError(
                 "At least one of apply_on_input, apply_on_hidden, or apply_on_output"
@@ -66,6 +66,7 @@ class MLPConfig:
         hidden_features: Number of hidden features in the MLP. If None, defaults to
             out_features.
     """
+
     block_config: MLPBlockConfig = field(default_factory=MLPBlockConfig)
     context_config: MLPContextConfig = field(default_factory=MLPContextConfig)
     num_layers: int = 2
@@ -81,12 +82,13 @@ class MLPBlock(BaseComponent):
         config: Configuration for the MLP block.
         context_features: Number of context features to concatenate to input.
     """
+
     def __init__(
         self,
         in_features: int,
         out_features: int,
         config: MLPBlockConfig,
-        context_features: int = 0
+        context_features: int = 0,
     ):
         """Linear layer with optional context, activation, normalization, dropout.
 
@@ -102,8 +104,9 @@ class MLPBlock(BaseComponent):
         """
         super().__init__()
         if config.do_residual and in_features != out_features:
-            raise ValueError("in_features must be equal to out_features for residual "
-                             "connection")
+            raise ValueError(
+                "in_features must be equal to out_features for residual connection"
+            )
 
         self._in_features = in_features
         self._out_features = out_features
@@ -119,9 +122,7 @@ class MLPBlock(BaseComponent):
         self.activation = self._get_activation(config.activation)
         self.norm = self._get_norm(config.norm, out_features)
         self.dropout = (
-            nn.Dropout(config.dropout)
-            if config.dropout > 0.0
-            else nn.Identity()
+            nn.Dropout(config.dropout) if config.dropout > 0.0 else nn.Identity()
         )
 
     def forward(
@@ -148,13 +149,13 @@ class MLPBlock(BaseComponent):
         if exists(context):
             # If batch-like dimensions do not match, refuse the temptation to guess.
             if context.shape[0] != x.shape[0]:
-                raise ValueError("Cannot resolve dimensional mismatch between x and "
-                                 "context on first dimension."
-                                 f" Got {x.shape=} and {context.shape=}")
+                raise ValueError(
+                    "Cannot resolve dimensional mismatch between x and "
+                    "context on first dimension."
+                    f" Got {x.shape=} and {context.shape=}"
+                )
             context = append_dimensions(context, x.ndim, 1).expand(
-                -1,
-                *x.shape[1:-1],
-                -1
+                -1, *x.shape[1:-1], -1
             )
             x_maybe_cat = th.cat([x, context], dim=-1)
         else:
@@ -246,6 +247,7 @@ class MLP(BaseComponent):
         out_features: Number of output features.
         config: Configuration for the MLP.
     """
+
     def __init__(
         self,
         in_features: int,
@@ -262,28 +264,19 @@ class MLP(BaseComponent):
         super().__init__()
         config = config if exists(config) else MLPConfig()
         hidden_features = (
-            config.hidden_features
-            if exists(config.hidden_features)
-            else out_features
+            config.hidden_features if exists(config.hidden_features) else out_features
         )
         self._in_features = in_features
         self._out_features = out_features
         self._hidden_features = hidden_features
         self._config = config
         self._num_layers = config.num_layers
-        self._context_config = (
-            config.context_config
-        )
+        self._context_config = config.context_config
         self._block_config = config.block_config
         self._check_valid_context()
         self._setup_layers()
 
-    def forward(
-        self,
-        x: th.Tensor,
-        *,
-        context: th.Tensor | None = None
-    ):
+    def forward(self, x: th.Tensor, *, context: th.Tensor | None = None):
         """Forward pass through the MLP.
 
         Args:
@@ -298,7 +291,7 @@ class MLP(BaseComponent):
             context=self._get_maybe_context(
                 context,
                 self._context_config.apply_on_input,
-            )
+            ),
         )
         for block in self._hidden_blocks:
             out = block(
@@ -306,14 +299,14 @@ class MLP(BaseComponent):
                 context=self._get_maybe_context(
                     context,
                     self._context_config.apply_on_hidden,
-                )
+                ),
             )
         return self._out_block(
             out,
             context=self._get_maybe_context(
                 context,
                 self._context_config.apply_on_output,
-            )
+            ),
         )
 
     def _check_valid_context(self):
@@ -326,13 +319,21 @@ class MLP(BaseComponent):
             return
         using_context = self._context_config.context_features > 0
 
-        if using_context and self._num_layers == 1 and not self._context_config.apply_on_input:
+        if (
+            using_context
+            and self._num_layers == 1
+            and not self._context_config.apply_on_input
+        ):
             raise ValueError(
                 "With only one layer, context can only be applied on input."
             )
-        if using_context and self._num_layers == 2 and not (
-            self._context_config.apply_on_input
-            or self._context_config.apply_on_output
+        if (
+            using_context
+            and self._num_layers == 2
+            and not (
+                self._context_config.apply_on_input
+                or self._context_config.apply_on_output
+            )
         ):
             raise ValueError(
                 "With two layers, context can only be applied on input or output."
@@ -349,21 +350,19 @@ class MLP(BaseComponent):
             ),
             config=self._block_config,
         )
-        self._hidden_blocks = nn.ModuleList(
-            [
-                MLPBlock(
-                    in_features=self._hidden_features,
-                    out_features=self._hidden_features,
-                    context_features=(
-                        self._context_config.context_features
-                        if self._context_config.apply_on_hidden
-                        else 0
-                    ),
-                    config=self._block_config,
-                )
-                for _ in range(self._num_layers - 2)
-            ]
-        )
+        self._hidden_blocks = nn.ModuleList([
+            MLPBlock(
+                in_features=self._hidden_features,
+                out_features=self._hidden_features,
+                context_features=(
+                    self._context_config.context_features
+                    if self._context_config.apply_on_hidden
+                    else 0
+                ),
+                config=self._block_config,
+            )
+            for _ in range(self._num_layers - 2)
+        ])
         self._out_block = MLPBlock(
             in_features=self._hidden_features,
             out_features=self._out_features,
@@ -380,24 +379,16 @@ class MLP(BaseComponent):
 
     @overload
     def _get_maybe_context(
-        self,
-        context: th.Tensor,
-        should_apply: Literal[True]
-    ) -> th.Tensor:
-        ...
+        self, context: th.Tensor, should_apply: Literal[True]
+    ) -> th.Tensor: ...
 
     @overload
     def _get_maybe_context(
-        self,
-        context: th.Tensor,
-        should_apply: Literal[False]
-    ) -> None:
-        ...
+        self, context: th.Tensor, should_apply: Literal[False]
+    ) -> None: ...
 
     def _get_maybe_context(
-        self,
-        context: th.Tensor | None,
-        should_apply: bool
+        self, context: th.Tensor | None, should_apply: bool
     ) -> th.Tensor | None:
         """Helper to get correctly select context or None."""
         if should_apply:

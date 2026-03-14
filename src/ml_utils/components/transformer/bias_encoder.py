@@ -3,7 +3,10 @@ from dataclasses import dataclass, field
 from torch import nn
 import torch as th
 
-from .bias_encoder_block import BiasTransformerEncoderBlock, BiasTransformerEncoderBlockConfig
+from .bias_encoder_block import (
+    BiasTransformerEncoderBlock,
+    BiasTransformerEncoderBlockConfig,
+)
 from ml_utils.components.base import BaseComponent
 from ml_utils.torch_utils.types import BatchedMatrixTensor, BatchSequenceTensor
 
@@ -15,6 +18,7 @@ class BiasTransformerEncoderConfig:
     Args:
 
     """
+
     num_layers: int = 6
     transformer_config: BiasTransformerEncoderBlockConfig = field(
         default_factory=BiasTransformerEncoderBlockConfig

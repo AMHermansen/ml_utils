@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Literal
-from typing_extensions import override
 
 import torch as th
+from typing_extensions import override
 
 from ml_utils.components import SwiGLUMLP
-from ml_utils.components.wrapper import ResidualConfig, Residual
-from ml_utils.components.attention import SelfAttentionBias, BiasAttentionConfig
+from ml_utils.components.attention import BiasAttentionConfig, SelfAttentionBias
 from ml_utils.components.base import BaseComponent
+from ml_utils.components.wrapper import Residual, ResidualConfig
 from ml_utils.torch_utils.types import BatchedMatrixTensor, BatchSequenceTensor
 
 
@@ -51,12 +51,7 @@ class BiasTransformerEncoderBlock(BaseComponent):
         self._in_features = in_features
         self._bias_features = bias_features
         self._config = config
-        ResidualWrapper = (
-            partial(
-                Residual,
-                config=self._config.residual_config
-            )
-        )
+        ResidualWrapper = partial(Residual, config=self._config.residual_config)
         self._attention = ResidualWrapper(
             SelfAttentionBias(
                 in_features=in_features,
@@ -101,7 +96,7 @@ class BiasTransformerEncoderBlock(BaseComponent):
     @override
     def out_features(self) -> int:
         return self._in_features
-    
+
     @property
     def in_bias_features(self) -> int:
         return self._bias_features

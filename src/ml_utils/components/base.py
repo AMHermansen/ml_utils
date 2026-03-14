@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 class BaseComponent(Module, ABC):
-
     @property
     @abstractmethod
     def out_features(self) -> int:

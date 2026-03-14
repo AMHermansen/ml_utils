@@ -81,12 +81,10 @@ class CumulativeSeqlengthCollator:
             var_name: th.cat([batch[var_name] for batch in batches], dim=0)
             for var_name in self.seqlen_variable_names
         }
-        non_seq_len_vars = default_collate(
-            [
-                {k: v for k, v in batch.items() if k not in self.names_used_for_seq_len}
-                for batch in batches
-            ]
-        )
+        non_seq_len_vars = default_collate([
+            {k: v for k, v in batch.items() if k not in self.names_used_for_seq_len}
+            for batch in batches
+        ])
         return {
             **seq_len_vars,
             **non_seq_len_vars,
@@ -156,7 +154,9 @@ class SequenceBucketingSampler(Sampler):
             per_bucket_batches.append(bucket_batches)
         return per_bucket_batches
 
-    def flatten_buckets(self, batched_buckets: list[list[th.Tensor]]) -> list[th.Tensor]:
+    def flatten_buckets(
+        self, batched_buckets: list[list[th.Tensor]]
+    ) -> list[th.Tensor]:
         """Flatten the per-bucket lists of batches into a single list of batches."""
         return [batch for bucket in batched_buckets for batch in bucket]
 

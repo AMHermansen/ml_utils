@@ -128,7 +128,9 @@ def configure_muon_optimizer(
             "adam_eps",
             1e-10,
         ),
-        "weight_decay": lightning_config.optimizer_kwargs.get("adam_weight_decay", 0.01),
+        "weight_decay": lightning_config.optimizer_kwargs.get(
+            "adam_weight_decay", 0.01
+        ),
         "use_muon": False,
     }
     optimizer = Muon([muon_group, adam_group])
@@ -137,8 +139,7 @@ def configure_muon_optimizer(
     }
     if lightning_config.scheduler_class is not None:
         scheduler = lightning_config.scheduler_class(
-            optimizer,
-            **lightning_config.scheduler_kwargs
+            optimizer, **lightning_config.scheduler_kwargs
         )
         config.update({  # type: ignore
             "lr_scheduler": {  # type: ignore

@@ -18,6 +18,7 @@ https://github.com/KellerJordan/Muon
 This file also includes code based on:
 https://github.com/mattcleigh/mltools
 """
+
 from collections.abc import Callable
 
 import torch as th

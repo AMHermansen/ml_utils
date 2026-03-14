@@ -101,17 +101,18 @@ def convert_to_torch(
     dtype: th.dtype | None = None,
 ):
     """Converts all numpy arrays in a nested collection to PyTorch tensors.
-    
+
     Args:
         data_collection: Any: A nested collection (list, tuple, dict) containing numpy arrays or PyTorch tensors.
         device: th.device | str: The device to move the tensors to.
-        dtype: th.dtype | None: The desired data type of the tensors. 
+        dtype: th.dtype | None: The desired data type of the tensors.
             If None the data type is converted to float32.
 
     Returns:
 
     """
     dtype = default(dtype, th.float32)
+
     def to_torch(x: np.ndarray | th.Tensor) -> th.Tensor:
         if isinstance(x, th.Tensor):
             x = x.to(device=device)

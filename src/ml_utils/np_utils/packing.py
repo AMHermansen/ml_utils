@@ -3,9 +3,11 @@ from typing import cast
 
 # Port of packing utilities from ml_utils.torch_utils.packing to numpy.
 
+
 def is_increasing_sequence(sequence: np.ndarray) -> bool:
     """Check if a sequence is strictly increasing."""
     return cast("bool", np.all(np.diff(sequence) >= 0))
+
 
 def pack_arrays(
     mask: np.ndarray,
@@ -48,10 +50,7 @@ def pack_arrays(
         packed_arrays.append(packed_array)
 
     cu_seqlens = np.cumsum(
-        np.concatenate([
-            np.zeros(1, dtype=np.int32),
-            mask.sum(axis=1)
-        ]),
+        np.concatenate([np.zeros(1, dtype=np.int32), mask.sum(axis=1)]),
         axis=0,
     )
     # We really, really do not want cu_seqlens to not be increasing.
@@ -158,9 +157,5 @@ def unpack_array(
         batched_array:
             Unpacked array with shape (B, N, ..., F).
     """
-    mask, (batched_array,) = unpack_arrays(
-        cu_seqlens,
-        array,
-        max_length=max_length
-    )
+    mask, (batched_array,) = unpack_arrays(cu_seqlens, array, max_length=max_length)
     return mask, batched_array
