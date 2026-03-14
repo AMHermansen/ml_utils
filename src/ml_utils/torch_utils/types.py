@@ -7,7 +7,9 @@ import torch as th
 
 GeneralBatchedTensor: TypeAlias = jt.Float[th.Tensor, " batch_size *features"]
 GeneralPackedTensor: TypeAlias = jt.Float[th.Tensor, " total_valid_entries *features"]
-GeneralUnpackedTensor: TypeAlias = jt.Float[th.Tensor, " batch_size max_length *features"]
+GeneralUnpackedTensor: TypeAlias = jt.Float[
+    th.Tensor, " batch_size max_length *features"
+]
 
 PackedTensor: TypeAlias = jt.Float[th.Tensor, " packed_length features"]
 BatchSequenceTensor: TypeAlias = jt.Float[th.Tensor, " batch_size length features"]
@@ -22,7 +24,9 @@ PackedMHATensor: TypeAlias = jt.Float[th.Tensor, "packed_length nheads features"
 PackedKVTensor: TypeAlias = jt.Float[th.Tensor, "packed_length 2 nheads features"]
 PackedQKVTensor: TypeAlias = jt.Float[th.Tensor, "packed_length 3 nheads features"]
 
-BatchedHeadedMatrixTensor: TypeAlias = jt.Float[th.Tensor, "batch_size length length dim"]
+BatchedHeadedMatrixTensor: TypeAlias = jt.Float[
+    th.Tensor, "batch_size length length dim"
+]
 
 AllPackedQKVTypes: TypeAlias = (
     tuple[PackedMHATensor, PackedMHATensor, PackedMHATensor]

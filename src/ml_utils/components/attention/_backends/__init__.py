@@ -11,6 +11,7 @@ try:
     from .flash_attention import common_flash_attention_interface
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
     logger.warning(
         "flash attention could not be imported, falling back to torch implementation."
@@ -20,5 +21,5 @@ except ImportError:
 __all__ = [
     "FlashAttentionKWArgs",
     "common_flash_attention_interface",
-    "torch_flash_attention_interface"
+    "torch_flash_attention_interface",
 ]

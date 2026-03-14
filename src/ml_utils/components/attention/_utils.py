@@ -85,7 +85,15 @@ def create_score_mod(bias_proj: BatchedHeadedMatrixTensor) -> ScoreModSignature:
         q_idx: th.Tensor,
         k_idx: th.Tensor,
     ) -> th.Tensor:
-        return score + bias_proj[batch, q_idx, k_idx, head, ]
+        return (
+            score
+            + bias_proj[
+                batch,
+                q_idx,
+                k_idx,
+                head,
+            ]
+        )
 
     return score_mod
 

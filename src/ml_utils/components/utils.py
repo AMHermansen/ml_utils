@@ -22,15 +22,15 @@ def instantiate_norm_layer(
     dim: int,
 ) -> nn.Module:
     """Utility function to instantiate a normalization layer based.
-    
+
     Args:
-        norm_type: The type of normalization layer to instantiate. 
-            Can be "layer" for LayerNorm, "rms" for RMSNorm, 
+        norm_type: The type of normalization layer to instantiate.
+            Can be "layer" for LayerNorm, "rms" for RMSNorm,
             or None for no normalization.
         dim: The dimension of the input features for the normalization layer.
 
     Returns:
-        An instance of the specified normalization layer or nn.Identity if no 
+        An instance of the specified normalization layer or nn.Identity if no
         normalization is specified.
 
     """

@@ -16,13 +16,14 @@ from .utils import PairFormerBlockConfig
 
 class Dropout(nn.Module):
     """Row and column dropout module for the PairFormer architecture.
-    
+
     Args:
         probability: Dropout probability.
         axis: Axis along which to apply dropout. "row" or "column". If None, reverts to
             standard dropout.
-    
+
     """
+
     def __init__(
         self,
         probability: float = 0.25,
@@ -66,12 +67,13 @@ class Dropout(nn.Module):
 
 class PairFormerBlock(nn.Module):
     """Implements a single block of the PairFormer architecture.
-    
+
     Args:
         single_features: Number of features in the single representations.
         pair_features: Number of features in the pair representations.
         config: Configuration for the PairFormer block. If None, default configuration is used.
     """
+
     def __init__(
         self,
         single_features: int,
@@ -79,7 +81,7 @@ class PairFormerBlock(nn.Module):
         config: PairFormerBlockConfig | None = None,
     ):
         """Initializes the PairFormer block.
-        
+
         Args:
             single_features: Number of features in the single representations.
             pair_features: Number of features in the pair representations.

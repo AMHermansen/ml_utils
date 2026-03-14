@@ -63,10 +63,9 @@ class PairFormer(nn.Module):
 
         if not exists(mask):
             assert exists(seq_lens)  # Should be guaranteed by previous check
-            mask = (
-                th.arange(seq_lens.max().item()).unsqueeze(0).to(seq_lens.device)
-                < seq_lens.unsqueeze(1)
-            )
+            mask = th.arange(seq_lens.max().item()).unsqueeze(0).to(
+                seq_lens.device
+            ) < seq_lens.unsqueeze(1)
         if not exists(seq_lens):
             assert exists(mask)  # Should be guaranteed by previous check
             seq_lens = mask.sum(dim=1)

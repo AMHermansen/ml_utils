@@ -127,7 +127,7 @@ class CosineEmbedding(BaseComponent):
         """
         self._check_bounds(x)
         # Normalize to [0, 1]
-        x = (x - self.min_value) / self.range  # type: ignore  
+        x = (x - self.min_value) / self.range  # type: ignore
         x = th.einsum("..., d -> ... d", x, self.freqs)  # (..., D)
 
         if self.do_sin:

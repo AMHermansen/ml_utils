@@ -1,4 +1,5 @@
 """Module containing functionality to help with Snakemake workflows."""
+
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -45,9 +46,11 @@ class SnakemakeConfirmFinish(Callback):
             self._output_file.parent.mkdir(parents=True, exist_ok=True)
         with self._output_file.open("w") as f:
             f.write(self._msg)
-    
+
     @override
-    def teardown(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", stage: str) -> None:
+    def teardown(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", stage: str
+    ) -> None:
         """Writes the confirmation file upon training completion.
 
         Args:
@@ -56,6 +59,7 @@ class SnakemakeConfirmFinish(Callback):
             stage: The stage of training ('fit', 'validate', 'test', or 'predict').
         """
         self._write_confirmation()
+
 
 def process_additional_params(prefix: str, **kwargs) -> list[str]:
     """Processes additional parameters for command generation.
@@ -78,12 +82,10 @@ def process_additional_params(prefix: str, **kwargs) -> list[str]:
 
 
 def add_snakemake_confirm_callback_command(output_file: str | Path) -> str:
-    return " ".join(
-        [
-            f"--trainer.callbacks+={SnakemakeConfirmFinish.__module__}.{SnakemakeConfirmFinish.__name__}",
-            f"--trainer.callbacks.output_file={output_file}",
-        ]
-    )
+    return " ".join([
+        f"--trainer.callbacks+={SnakemakeConfirmFinish.__module__}.{SnakemakeConfirmFinish.__name__}",
+        f"--trainer.callbacks.output_file={output_file}",
+    ])
 
 
 def add_checkpoint_command(
@@ -119,11 +121,15 @@ def add_checkpoint_command(
             f"--trainer.callbacks.mode={mode}",
             f"--trainer.callbacks.dirpath={dir_path!s}",
             f"--trainer.callbacks.save_top_k={save_top_k}",
-        ] + process_additional_params("trainer.callbacks", **kwargs)
+        ]
+        + process_additional_params("trainer.callbacks", **kwargs)
     )
 
+
 # Convenience partial functions for common checkpoint configurations
-add_best_checkpoint_command = partial(add_checkpoint_command, save_top_k=1, filename="best")
+add_best_checkpoint_command = partial(
+    add_checkpoint_command, save_top_k=1, filename="best"
+)
 
 
 def add_early_stopping_command(
@@ -153,7 +159,8 @@ def add_early_stopping_command(
             f"--trainer.callbacks.monitor={monitor}",
             f"--trainer.callbacks.patience={patience}",
             f"--trainer.callbacks.mode={mode}",
-        ] + process_additional_params("trainer.callbacks", **kwargs)
+        ]
+        + process_additional_params("trainer.callbacks", **kwargs)
     )
 
 
@@ -178,7 +185,8 @@ def add_learning_rate_monitor_command(
         [
             "--trainer.callbacks+=lightning.pytorch.callbacks.LearningRateMonitor",
             f"--trainer.callbacks.logging_interval={logging_interval}",
-        ] + process_additional_params("trainer.callbacks", **kwargs)
+        ]
+        + process_additional_params("trainer.callbacks", **kwargs)
     )
 
 
@@ -203,7 +211,9 @@ def add_wandb_logger_command(
         WandbLogger.
     """
     tags_command_prefix = "--trainer.logger.init_args.tags"
-    tags_command = " ".join([f"{tags_command_prefix}+='{tag}'" for tag in tags] if tags else "")
+    tags_command = " ".join(
+        [f"{tags_command_prefix}+='{tag}'" for tag in tags] if tags else ""
+    )
     return " ".join(
         [
             f"--trainer.logger.class_path=lightning.pytorch.loggers.WandbLogger",
@@ -211,7 +221,8 @@ def add_wandb_logger_command(
             f"--trainer.logger.init_args.name={name}",
             f"--trainer.logger.init_args.save_dir={save_dir}",
             f"{tags_command}",
-        ] + process_additional_params("trainer.logger.init_args", **kwargs)
+        ]
+        + process_additional_params("trainer.logger.init_args", **kwargs)
     )
 
 
@@ -225,10 +236,8 @@ def add_csv_logger_command(save_dir: Path) -> str:
         A command string to be used in a Snakemake workflow for adding the
         CSVLogger.
     """
-    return " ".join(
-        [
-            f"--trainer.logger.class_path=lightning.pytorch.loggers.CSVLogger",
-            f"--trainer.logger.init_args.save_dir={save_dir}",
-            f"--trainer.logger.init_args.name=csv_logs",
-        ]
-    )
+    return " ".join([
+        f"--trainer.logger.class_path=lightning.pytorch.loggers.CSVLogger",
+        f"--trainer.logger.init_args.save_dir={save_dir}",
+        f"--trainer.logger.init_args.name=csv_logs",
+    ])

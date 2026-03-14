@@ -164,11 +164,7 @@ def unpack_tensor(
         batched_tensor:
             Unpacked tensor with shape (B, N, ..., F).
     """
-    mask, (batched_tensor,) = unpack_tensors(
-        cu_seqlens,
-        tensor,
-        max_length=max_length
-    )
+    mask, (batched_tensor,) = unpack_tensors(cu_seqlens, tensor, max_length=max_length)
     return mask, batched_tensor
 
 
@@ -247,8 +243,7 @@ def remove_tokens_from_packed_tensor(
 
 
 def get_masked_cu_seqlens(
-    cu_seqlens: CulensTensor,
-    mask: jt.Bool[th.Tensor, " total_seqlen"]
+    cu_seqlens: CulensTensor, mask: jt.Bool[th.Tensor, " total_seqlen"]
 ) -> CulensTensor:
     """Get cumulative sequence lengths after applying a mask.
 
@@ -262,15 +257,13 @@ def get_masked_cu_seqlens(
     assert is_increasing_sequence(cu_seqlens), (
         "cu_seqlens must be an increasing sequence"
     )
-    cumulative_number_of_masked_elements = th.cat(
-        [
-            th.zeros(1, device=mask.device, dtype=th.int32),
-            th.cumsum(
-                mask.to(dtype=th.int32),
-                dim=0,
-            )
-        ]
-    )
+    cumulative_number_of_masked_elements = th.cat([
+        th.zeros(1, device=mask.device, dtype=th.int32),
+        th.cumsum(
+            mask.to(dtype=th.int32),
+            dim=0,
+        ),
+    ])
     return cumulative_number_of_masked_elements[cu_seqlens].to(dtype=th.int32)
 
 
@@ -279,11 +272,11 @@ def get_packed_mean_loss(
     cu_seqlens: CulensTensor,
 ) -> th.Tensor:
     """Compute the combined mean loss from packed losses.
-    
+
     Args:
         packed_losses: The packed losses for each valid entry. Shape (total_len,).
         cu_seqlens: The cumulative sequence lengths. Shape (B+1,).
-    
+
     Returns:
         th.Tensor: The combined mean loss as a scalar tensor.
     """

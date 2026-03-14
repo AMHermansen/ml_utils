@@ -28,10 +28,8 @@ class QKNorm(nn.Module):
     def forward(
         self,
         query: jt.Float[th.Tensor, "*batch dim"],
-        key: jt.Float[th.Tensor, "*batch dim"]) -> tuple[
-        jt.Float[th.Tensor, "*batch dim"],
-        jt.Float[th.Tensor, "*batch dim"]
-    ]:
+        key: jt.Float[th.Tensor, "*batch dim"],
+    ) -> tuple[jt.Float[th.Tensor, "*batch dim"], jt.Float[th.Tensor, "*batch dim"]]:
         """Forward pass for QK normalization.
 
         Args:

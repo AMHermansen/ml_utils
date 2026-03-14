@@ -150,9 +150,7 @@ class PackedCrossAttention(BaseComponent):
         return self._out_proj(attn_out_unheaded)
 
     def _maybe_apply_qknorm(
-        self,
-        q_embedded: PackedTensor,
-        kv_embedded: PackedTensor
+        self, q_embedded: PackedTensor, kv_embedded: PackedTensor
     ) -> AllPackedQKVTypes:
         """Applies QKNorm if enabled. Otherwise, just converts KV to headed layout.
 
