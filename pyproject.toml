@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "jaxtyping>=0.3.2",
     "lightning>=2.5.5",
-    "torch>=2.8.0",
+    "torch==2.8",
     "h5py>=3.15.1",
     "einops>=0.8.1",
     "einx>=0.3.0",

@@ -486,7 +486,7 @@ requires-dist = [
     { name = "jaxtyping", specifier = ">=0.3.2" },
     { name = "lightning", specifier = ">=2.5.5" },
     { name = "lion-pytorch", marker = "extra == 'lion'", specifier = ">=0.2.3" },
-    { name = "torch", specifier = ">=2.8.0" },
+    { name = "torch", specifier = "==2.8" },
 ]
 provides-extras = ["lion", "flash-attn"]
 
