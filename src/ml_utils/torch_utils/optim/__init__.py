@@ -1,10 +1,16 @@
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 from .adamws import AdamWS
 from .muon import Muon, suitable_for_muon
-from .schedulers import LinearWarmupCosineDecay
+from .schedulers import (
+    CyclicWithWarmup,
+    LinearWarmupCosineDecay,
+    LinearWarmupRootDecay,
+    WarmupToConstant,
+)
 
 try:
     from lion_pytorch import Lion
@@ -17,8 +23,11 @@ except ImportError:
 
 __all__ = [
     "AdamWS",
+    "CyclicWithWarmup",
     "LinearWarmupCosineDecay",
+    "LinearWarmupRootDecay",
     "Lion",
     "Muon",
+    "WarmupToConstant",
     "suitable_for_muon",
 ]
