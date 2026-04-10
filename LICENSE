@@ -38,6 +38,5 @@ from the following open-source projects:
    License: MIT License
 
 Each third-party component retains its own copyright notice and license terms,
-as noted above. Full copies of the original MIT license texts can be found
-in the corresponding repositories or in this project's `third_party_licenses/`
-folder
+as noted above. Full copies of the applicable third-party MIT license texts are included 
+in this distribution in the third_party_licenses/ folder.
